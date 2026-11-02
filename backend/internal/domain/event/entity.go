@@ -55,12 +55,12 @@ var (
 type Event struct {
 	ID                   uuid.UUID     `json:"id"`
 	CreatorID            uuid.UUID     `json:"creator_id"`
-	CreatorName          string        `json:"creator_name,omitempty"`
-	CreatorAvatar        *string       `json:"creator_avatar,omitempty"`
+	CreatorName          string        `json:"creator_name,omitempty" gorm:"-"`
+	CreatorAvatar        *string       `json:"creator_avatar,omitempty" gorm:"-"`
 	Name                 string        `json:"name"`
 	Description          string        `json:"description"`
 	CoverImageKey        *string       `json:"cover_image_key,omitempty"`
-	CoverImageURL        *string       `json:"cover_image_url,omitempty"`
+	CoverImageURL        *string       `json:"cover_image_url,omitempty" gorm:"-"`
 	FishingSpotID        *uuid.UUID    `json:"fishing_spot_id,omitempty"`
 	DestinationName      string        `json:"destination_name"`
 	DestinationAddress   string        `json:"destination_address"`
@@ -78,7 +78,7 @@ type Event struct {
 	AdditionalCost       *string       `json:"additional_cost,omitempty"`
 	Visibility           string        `json:"visibility"`
 	MaxParticipants      *int          `json:"max_participants,omitempty"`
-	ApprovedParticipants int           `json:"approved_participants"`
+	ApprovedParticipants int           `json:"approved_participants" gorm:"-"`
 	RegistrationDeadline *time.Time    `json:"registration_deadline,omitempty"`
 	Status               string        `json:"status"`
 	CreatedAt            time.Time     `json:"created_at"`
@@ -87,14 +87,14 @@ type Event struct {
 
 // Participant represents a user joining an event.
 type Participant struct {
-	ID       uuid.UUID `json:"id"`
-	EventID  uuid.UUID `json:"event_id"`
-	UserID   uuid.UUID `json:"user_id"`
-	UserName string    `json:"user_name,omitempty"`
-	UserAvatar *string `json:"user_avatar,omitempty"`
-	Role     string    `json:"role"`
-	Status   string    `json:"status"`
-	JoinedAt time.Time `json:"joined_at"`
+	ID         uuid.UUID `json:"id"`
+	EventID    uuid.UUID `json:"event_id"`
+	UserID     uuid.UUID `json:"user_id"`
+	UserName   string    `json:"user_name,omitempty" gorm:"-"`
+	UserAvatar *string   `json:"user_avatar,omitempty" gorm:"-"`
+	Role       string    `json:"role"`
+	Status     string    `json:"status"`
+	JoinedAt   time.Time `json:"joined_at"`
 }
 
 // CanAcceptParticipant checks if the event can accept another participant.

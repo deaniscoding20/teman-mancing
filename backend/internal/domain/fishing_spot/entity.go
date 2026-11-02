@@ -15,11 +15,11 @@ type FishingSpot struct {
 	Address          string             `json:"address"`
 	Latitude         float64            `json:"latitude"`
 	Longitude        float64            `json:"longitude"`
-	Photos           []Photo            `json:"photos,omitempty"`
-	FishTypes        []FishType         `json:"fish_types,omitempty"`
-	Techniques       []FishingTechnique `json:"techniques,omitempty"`
-	RecommendedBaits []RecommendedBait  `json:"recommended_baits,omitempty"`
-	CommentsCount    int64              `json:"comments_count,omitempty"`
+	Photos           []Photo            `json:"photos,omitempty" gorm:"-"`
+	FishTypes        []FishType         `json:"fish_types,omitempty" gorm:"-"`
+	Techniques       []FishingTechnique `json:"techniques,omitempty" gorm:"-"`
+	RecommendedBaits []RecommendedBait  `json:"recommended_baits,omitempty" gorm:"-"`
+	CommentsCount    int64              `json:"comments_count,omitempty" gorm:"-"`
 	CreatedAt        time.Time          `json:"created_at"`
 	UpdatedAt        time.Time          `json:"updated_at"`
 }
@@ -29,7 +29,7 @@ type Photo struct {
 	ID        uuid.UUID `json:"id"`
 	SpotID    uuid.UUID `json:"spot_id"`
 	ObjectKey string    `json:"object_key"`
-	URL       string    `json:"url,omitempty"`
+	URL       string    `json:"url,omitempty" gorm:"-"`
 	IsPrimary bool      `json:"is_primary"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -59,8 +59,8 @@ type Comment struct {
 	ID        uuid.UUID `json:"id"`
 	SpotID    uuid.UUID `json:"spot_id"`
 	UserID    uuid.UUID `json:"user_id"`
-	UserName  string    `json:"user_name,omitempty"`
-	UserAvatar *string  `json:"user_avatar,omitempty"`
+	UserName  string    `json:"user_name,omitempty" gorm:"-"`
+	UserAvatar *string  `json:"user_avatar,omitempty" gorm:"-"`
 	Comment   string    `json:"comment"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
