@@ -5,8 +5,10 @@ import (
 	"go.uber.org/zap"
 
 	"teman-mancing/backend/internal/application/auth"
+	appchat "teman-mancing/backend/internal/application/chat"
 	appevent "teman-mancing/backend/internal/application/event"
 	appspot "teman-mancing/backend/internal/application/fishing_spot"
+	appnotif "teman-mancing/backend/internal/application/notification"
 	appuser "teman-mancing/backend/internal/application/user"
 	"teman-mancing/backend/internal/config"
 	"teman-mancing/backend/internal/delivery/http/handlers"
@@ -14,6 +16,7 @@ import (
 	"teman-mancing/backend/internal/infrastructure/database"
 	"teman-mancing/backend/internal/infrastructure/security"
 	"teman-mancing/backend/internal/infrastructure/storage"
+	infraWS "teman-mancing/backend/internal/infrastructure/websocket"
 )
 
 // RouterDeps bundles router dependencies.
@@ -25,8 +28,10 @@ type RouterDeps struct {
 	TokenService *security.TokenService
 	UserRepo     appuser.Repository
 	SpotRepo     appspot.Repository
-	EventRepo    appevent.Repository
-	Version      string
+	EventRepo        appevent.Repository
+	ChatRepo         appchat.Repository
+	NotificationRepo appnotif.Repository
+	Version          string
 }
 
 // SetupRouter initializes the Gin engine and configures all routes.
@@ -85,6 +90,24 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 		}
 	}
 
+	chatRepo := deps.ChatRepo
+	if chatRepo == nil {
+		if deps.DB != nil && deps.DB.DB != nil {
+			chatRepo = database.NewGormChatRepository(deps.DB.DB)
+		} else {
+			chatRepo = database.NewInMemoryChatRepository()
+		}
+	}
+
+	notifRepo := deps.NotificationRepo
+	if notifRepo == nil {
+		if deps.DB != nil && deps.DB.DB != nil {
+			notifRepo = database.NewGormNotificationRepository(deps.DB.DB)
+		} else {
+			notifRepo = database.NewInMemoryNotificationRepository()
+		}
+	}
+
 	tokenService := deps.TokenService
 	if tokenService == nil {
 		tokenService = security.NewTokenService(deps.Config.JWTSecret, deps.Config.JWTExpiration)
@@ -99,6 +122,13 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 
 	eventService := appevent.NewService(eventRepo)
 	eventHandler := handlers.NewEventHandler(eventService)
+
+	chatService := appchat.NewService(chatRepo)
+	wsHub := infraWS.NewHub(chatService, deps.Logger)
+	chatHandler := handlers.NewChatHandler(chatService, wsHub)
+
+	notifService := appnotif.NewService(notifRepo)
+	notifHandler := handlers.NewNotificationHandler(notifService)
 
 	// API v1 Group
 	v1 := r.Group("/api/v1")
@@ -161,9 +191,25 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 			eventsGroup.POST("/:id/requests/:userId/reject", middleware.RequireAuth(tokenService), eventHandler.RejectRequest)
 		}
 
-		// Feature route groups
-		_ = v1.Group("/conversations")
-		_ = v1.Group("/notifications")
+		// Conversations & Chat Routes (README Section 13)
+		chatGroup := v1.Group("/conversations")
+		{
+			chatGroup.GET("", middleware.RequireAuth(tokenService), chatHandler.ListConversations)
+			chatGroup.POST("", middleware.RequireAuth(tokenService), chatHandler.CreateConversation)
+			chatGroup.GET("/:id/messages", middleware.RequireAuth(tokenService), chatHandler.ListMessages)
+			chatGroup.POST("/:id/messages", middleware.RequireAuth(tokenService), chatHandler.SendMessage)
+		}
+
+		// Realtime WebSocket Endpoint (README Section 13 & 9.4)
+		v1.GET("/ws", middleware.RequireAuth(tokenService), chatHandler.WebSocket)
+
+		// Notifications Routes (README Section 13)
+		notifGroup := v1.Group("/notifications")
+		{
+			notifGroup.GET("", middleware.RequireAuth(tokenService), notifHandler.List)
+			notifGroup.PATCH("/:id/read", middleware.RequireAuth(tokenService), notifHandler.MarkAsRead)
+			notifGroup.POST("/read-all", middleware.RequireAuth(tokenService), notifHandler.MarkAllAsRead)
+		}
 	}
 
 	return r

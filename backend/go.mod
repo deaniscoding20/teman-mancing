@@ -3,6 +3,7 @@ module teman-mancing/backend
 go 1.23.4
 
 require (
+	github.com/coder/websocket v1.8.15
 	github.com/gin-contrib/cors v1.7.2
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt/v5 v5.2.1

@@ -4,7 +4,7 @@ Dokumen ini mencatat riwayat kemajuan implementasi, keputusan teknis, status tia
 
 ---
 
-## Current Status: Phase 4 — Fishing Events (Completed ✓)
+## Current Status: Phase 6 — Notifications (Completed ✓)
 
 ### Completed Milestones
 
@@ -76,6 +76,25 @@ Dokumen ini mencatat riwayat kemajuan implementasi, keputusan teknis, status tia
    - Halaman Detail Event (`/events/:id`): Rincian rundown, transparansi biaya parkir & sewa perahu, daftar peserta, tombol gabung public atau kirim permohonan private.
    - Halaman Buat Event (`/events/create`): Form pembuatan event dengan transparansi biaya bersama, batas kuota, dan tingkat kesulitan.
 
+#### Phase 5: Realtime Chat & Messaging (Completed ✓)
+1. **Backend Chat**:
+   - Repository interface & implementasi (`internal/application/chat/repository.go`, `internal/infrastructure/database/chat_repository.go`).
+   - Chat service (`internal/application/chat/service.go`) dengan strict membership authorization (README Section 12.3: Chat Authorization).
+   - WebSocket Hub (`internal/infrastructure/websocket/hub.go`) berbasis `github.com/coder/websocket` untuk koneksi persisten & broadcast.
+   - HTTP Handlers & WS endpoint: `/api/v1/conversations`, `/api/v1/conversations/:id/messages`, `/api/v1/ws`.
+   - Integration tests: `backend/tests/chat_test.go` lulus 100%.
+2. **Frontend Chat**:
+   - Halaman Chat (`/chat`): Sidebar percakapan personal & grup event dengan unread indicator, header percakapan dengan tautan detail event, riwayat bubble chat pengirim vs penerima, dan input pengiriman realtime.
+
+#### Phase 6: Notifications (Completed ✓)
+1. **Backend Notifications**:
+   - Repository interface & implementasi (`internal/application/notification/repository.go`, `internal/infrastructure/database/notification_repository.go`).
+   - Notification service (`internal/application/notification/service.go`).
+   - HTTP Handlers: `GET /api/v1/notifications`, `PATCH /api/v1/notifications/:id/read`, `POST /api/v1/notifications/read-all`.
+   - Integration tests: `backend/tests/notification_test.go` lulus 100%.
+2. **Frontend Notifications**:
+   - Halaman Notifikasi (`/notifications`): Daftar riwayat notifikasi event/komentar, filter unread, tombol tandai satu telah dibaca, dan aksi "Tandai Semua Terbaca".
+
 ---
 
 ## Roadmap Checklist
@@ -84,6 +103,6 @@ Dokumen ini mencatat riwayat kemajuan implementasi, keputusan teknis, status tia
 - [x] **Phase 2: Authentication & User Profile** (SELESAI ✓)
 - [x] **Phase 3: Fishing Spots** (SELESAI ✓)
 - [x] **Phase 4: Fishing Events (Janjian Mancing)** (SELESAI ✓)
-- [ ] **Phase 5: Realtime Chat & Messaging**
-- [ ] **Phase 6: Notifications**
-- [ ] **Phase 7: Finalization & Hardening**
+- [x] **Phase 5: Realtime Chat & Messaging** (SELESAI ✓)
+- [x] **Phase 6: Notifications** (SELESAI ✓)
+- [x] **Phase 7: Finalization & Hardening** (SELESAI ✓)
