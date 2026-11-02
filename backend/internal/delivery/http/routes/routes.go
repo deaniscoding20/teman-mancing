@@ -5,6 +5,7 @@ import (
 	"go.uber.org/zap"
 
 	"teman-mancing/backend/internal/application/auth"
+	appspot "teman-mancing/backend/internal/application/fishing_spot"
 	appuser "teman-mancing/backend/internal/application/user"
 	"teman-mancing/backend/internal/config"
 	"teman-mancing/backend/internal/delivery/http/handlers"
@@ -22,6 +23,7 @@ type RouterDeps struct {
 	MinIO        *storage.MinIOClient
 	TokenService *security.TokenService
 	UserRepo     appuser.Repository
+	SpotRepo     appspot.Repository
 	Version      string
 }
 
@@ -63,6 +65,15 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 		}
 	}
 
+	spotRepo := deps.SpotRepo
+	if spotRepo == nil {
+		if deps.DB != nil && deps.DB.DB != nil {
+			spotRepo = database.NewGormSpotRepository(deps.DB.DB)
+		} else {
+			spotRepo = database.NewInMemorySpotRepository()
+		}
+	}
+
 	tokenService := deps.TokenService
 	if tokenService == nil {
 		tokenService = security.NewTokenService(deps.Config.JWTSecret, deps.Config.JWTExpiration)
@@ -71,6 +82,9 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 	authService := auth.NewAuthService(userRepo, tokenService)
 	authHandler := handlers.NewAuthHandler(authService)
 	userHandler := handlers.NewUserHandler(authService, deps.MinIO)
+
+	spotService := appspot.NewService(spotRepo)
+	spotHandler := handlers.NewSpotHandler(spotService, deps.MinIO)
 
 	// API v1 Group
 	v1 := r.Group("/api/v1")
@@ -95,8 +109,26 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 			userGroup.POST("/me/avatar", middleware.RequireAuth(tokenService), userHandler.UploadAvatar)
 		}
 
+		// Fishing Spots Routes (README Section 13)
+		spotsGroup := v1.Group("/spots")
+		{
+			spotsGroup.GET("", spotHandler.List)
+			spotsGroup.POST("", middleware.RequireAuth(tokenService), spotHandler.Create)
+			spotsGroup.GET("/:id", spotHandler.GetByID)
+			spotsGroup.PATCH("/:id", middleware.RequireAuth(tokenService), spotHandler.Update)
+			spotsGroup.DELETE("/:id", middleware.RequireAuth(tokenService), spotHandler.Delete)
+			spotsGroup.POST("/:id/photos", middleware.RequireAuth(tokenService), spotHandler.UploadPhoto)
+			spotsGroup.DELETE("/:id/photos/:photoId", middleware.RequireAuth(tokenService), spotHandler.DeletePhoto)
+
+			// Comments
+			spotsGroup.GET("/:id/comments", spotHandler.ListComments)
+			spotsGroup.POST("/:id/comments", middleware.RequireAuth(tokenService), spotHandler.CreateComment)
+		}
+
+		// Comments direct endpoint (README Section 13)
+		v1.DELETE("/comments/:id", middleware.RequireAuth(tokenService), spotHandler.DeleteComment)
+
 		// Feature route groups
-		_ = v1.Group("/spots")
 		_ = v1.Group("/events")
 		_ = v1.Group("/conversations")
 		_ = v1.Group("/notifications")
