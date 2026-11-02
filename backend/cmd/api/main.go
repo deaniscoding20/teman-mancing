@@ -15,6 +15,7 @@ import (
 	"teman-mancing/backend/internal/delivery/http/routes"
 	"teman-mancing/backend/internal/infrastructure/database"
 	"teman-mancing/backend/internal/infrastructure/logger"
+	"teman-mancing/backend/internal/infrastructure/security"
 	"teman-mancing/backend/internal/infrastructure/storage"
 )
 
@@ -74,13 +75,17 @@ func main() {
 		cancel()
 	}
 
-	// 5. Setup Gin Router & Middlewares
+	// 5. Setup Token Service & Repositories
+	tokenService := security.NewTokenService(cfg.JWTSecret, cfg.JWTExpiration)
+
+	// 6. Setup Gin Router & Middlewares
 	router := routes.SetupRouter(routes.RouterDeps{
-		Config:  cfg,
-		Logger:  log,
-		DB:      dbConn,
-		MinIO:   minioClient,
-		Version: AppVersion,
+		Config:       cfg,
+		Logger:       log,
+		DB:           dbConn,
+		MinIO:        minioClient,
+		TokenService: tokenService,
+		Version:      AppVersion,
 	})
 
 	// 6. Setup HTTP Server
