@@ -4,7 +4,7 @@ Dokumen ini mencatat riwayat kemajuan implementasi, keputusan teknis, status tia
 
 ---
 
-## Current Status: Phase 3 — Fishing Spots (Completed ✓)
+## Current Status: Phase 4 — Fishing Events (Completed ✓)
 
 ### Completed Milestones
 
@@ -61,6 +61,21 @@ Dokumen ini mencatat riwayat kemajuan implementasi, keputusan teknis, status tia
    - Halaman Detail Spot (`/spots/:id`): Informasi lengkap spot, peta interaktif OpenStreetMap embed, daftar umpan rekomendasi, target ikan, teknik, dan sistem ulasan komentar interaktif realtime.
    - Halaman Tambah Spot (`/spots/create`): Form pembuatan spot baru dengan input dinamis umpan rekomendasi, target jenis ikan, teknik mancing, dan koordinat.
 
+#### Phase 4: Fishing Events / Janjian Mancing (Completed ✓)
+1. **Backend Fishing Events**:
+   - Domain entity & repository interface (`internal/application/event/repository.go`).
+   - Event repository implementation (`internal/infrastructure/database/event_repository.go`):
+     - Pencegahan Race Condition dengan database row-level locking (`SELECT ... FOR UPDATE`) dalam ACID transaction (README Section 12.1 & 12.2).
+     - Validasi duplikasi pendaftaran (`UNIQUE (event_id, user_id)`).
+     - Public vs Private approval workflow (pending request -> host approval).
+     - Alur otomatisasi membership group chat saat status peserta approved.
+   - HTTP Handlers: `internal/delivery/http/handlers/event.go`.
+   - Integration tests: `backend/tests/event_test.go` lulus 100%.
+2. **Frontend Fishing Events**:
+   - Halaman Listing Event (`/events`): Card agenda, tanggal & waktu, titik kumpul, status kuota, badge public/private.
+   - Halaman Detail Event (`/events/:id`): Rincian rundown, transparansi biaya parkir & sewa perahu, daftar peserta, tombol gabung public atau kirim permohonan private.
+   - Halaman Buat Event (`/events/create`): Form pembuatan event dengan transparansi biaya bersama, batas kuota, dan tingkat kesulitan.
+
 ---
 
 ## Roadmap Checklist
@@ -68,7 +83,7 @@ Dokumen ini mencatat riwayat kemajuan implementasi, keputusan teknis, status tia
 - [x] **Phase 1: Project Foundation** (SELESAI ✓)
 - [x] **Phase 2: Authentication & User Profile** (SELESAI ✓)
 - [x] **Phase 3: Fishing Spots** (SELESAI ✓)
-- [ ] **Phase 4: Fishing Events (Janjian Mancing)**
+- [x] **Phase 4: Fishing Events (Janjian Mancing)** (SELESAI ✓)
 - [ ] **Phase 5: Realtime Chat & Messaging**
 - [ ] **Phase 6: Notifications**
 - [ ] **Phase 7: Finalization & Hardening**
