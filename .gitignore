@@ -1,0 +1,63 @@
+# Binaries and executables
+backend/bin/
+backend/tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+*.tsbuildinfo
+
+# Go workspace file
+go.work
+
+# Dependencies and Node
+node_modules/
+frontend/node_modules/
+.pnp
+.pnp.js
+
+# Next.js build output
+.next/
+frontend/.next/
+out/
+frontend/out/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+frontend/.env
+infrastructure/docker/.env
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Storage & Database data (if mounted locally)
+infrastructure/docker/data/
+postgres_data/
+minio_data/

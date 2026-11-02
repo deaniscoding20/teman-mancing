@@ -1,0 +1,139 @@
+version: '3.8'
+
+services:
+  # ==========================================================
+  # 1. PostgreSQL 16 Database
+  # ==========================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: teman_mancing_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-teman_mancing_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-teman_mancing_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-teman_mancing}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-teman_mancing_user} -d ${POSTGRES_DB:-teman_mancing}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - teman_mancing_net
+
+  # ==========================================================
+  # 2. MinIO S3 Object Storage
+  # ==========================================================
+  minio:
+    image: minio/minio:latest
+    container_name: teman_mancing_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadminsecret}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - teman_mancing_net
+
+  # ==========================================================
+  # 3. MinIO Bucket Provisioner (One-shot)
+  # ==========================================================
+  minio-create-buckets:
+    image: minio/mc:latest
+    container_name: teman_mancing_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadminsecret};
+      /usr/bin/mc mb --ignore-existing myminio/${MINIO_BUCKET_AVATARS:-avatars};
+      /usr/bin/mc mb --ignore-existing myminio/${MINIO_BUCKET_SPOTS:-fishing-spots};
+      /usr/bin/mc mb --ignore-existing myminio/${MINIO_BUCKET_EVENTS:-event-covers};
+      /usr/bin/mc anonymous set download myminio/${MINIO_BUCKET_AVATARS:-avatars};
+      /usr/bin/mc anonymous set download myminio/${MINIO_BUCKET_SPOTS:-fishing-spots};
+      /usr/bin/mc anonymous set download myminio/${MINIO_BUCKET_EVENTS:-event-covers};
+      echo 'MinIO buckets initialized successfully.';
+      exit 0;
+      "
+    networks:
+      - teman_mancing_net
+
+  # ==========================================================
+  # 4. Backend Golang Service
+  # ==========================================================
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    container_name: teman_mancing_backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    environment:
+      APP_ENV: development
+      APP_PORT: 8080
+      DATABASE_URL: postgres://${POSTGRES_USER:-teman_mancing_user}:${POSTGRES_PASSWORD:-teman_mancing_secret}@postgres:5432/${POSTGRES_DB:-teman_mancing}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-teman-mancing-min-32-chars-long}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadminsecret}
+      MINIO_USE_SSL: "false"
+      MINIO_BUCKET_AVATARS: ${MINIO_BUCKET_AVATARS:-avatars}
+      MINIO_BUCKET_SPOTS: ${MINIO_BUCKET_SPOTS:-fishing-spots}
+      MINIO_BUCKET_EVENTS: ${MINIO_BUCKET_EVENTS:-event-covers}
+      ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-create-buckets:
+        condition: service_completed_successfully
+    networks:
+      - teman_mancing_net
+
+  # ==========================================================
+  # 5. Frontend Next.js Service
+  # ==========================================================
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    container_name: teman_mancing_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3080}:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
+      NEXT_PUBLIC_WS_URL: ws://localhost:8080/ws
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - teman_mancing_net
+
+networks:
+  teman_mancing_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  minio_data:
+    driver: local
