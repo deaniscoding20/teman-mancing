@@ -97,7 +97,7 @@ services:
       MINIO_BUCKET_AVATARS: ${MINIO_BUCKET_AVATARS:-avatars}
       MINIO_BUCKET_SPOTS: ${MINIO_BUCKET_SPOTS:-fishing-spots}
       MINIO_BUCKET_EVENTS: ${MINIO_BUCKET_EVENTS:-event-covers}
-      ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3003,http://127.0.0.1:3003,http://localhost:3080,http://127.0.0.1:3080,http://localhost:3000,http://127.0.0.1:3000}
     depends_on:
       postgres:
         condition: service_healthy
@@ -115,13 +115,16 @@ services:
     build:
       context: ../../frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}
+        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:8080/ws}
     container_name: teman_mancing_frontend
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-3080}:3000"
+      - "${FRONTEND_PORT:-3003}:3000"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
-      NEXT_PUBLIC_WS_URL: ws://localhost:8080/ws
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:8080/ws}
     depends_on:
       backend:
         condition: service_healthy

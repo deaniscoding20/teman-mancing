@@ -7,7 +7,7 @@ Dokumen ini ditujukan bagi AI Agent atau DevOps Engineer yang akan melakukan **c
 ## 1. Arsitektur & Port Default
 
 Platform Teman Mancing menggunakan arsitektur **Modular Monolith**:
-* **Frontend**: Next.js 14 (App Router, Tailwind CSS, TypeScript) ➔ **Port 3080**
+* **Frontend**: Next.js 14 (App Router, Tailwind CSS, TypeScript) ➔ **Port 3003** (atau 3080)
 * **Backend**: Golang 1.23 (Gin Framework, Clean Architecture, WebSocket) ➔ **Port 8080**
 * **Database**: PostgreSQL 16 ➔ **Port 5432**
 * **Object Storage**: MinIO (S3-Compatible Storage) ➔ **Port 9000** (API) & **Port 9001** (Console Web)
@@ -22,7 +22,7 @@ Pastikan VPS telah terinstal tools berikut:
 * **Docker**: Versi 24.0+ (`docker --version`)
 * **Docker Compose**: Plugin compose v2 (`docker compose version`)
 * **Port yang harus dibuka (Firewall / Security Group)**:
-  * `3080` (Akses Web Frontend)
+  * `3003` (Akses Web Frontend)
   * `8080` (Akses REST API & WebSocket)
   * `9001` (Akses MinIO Web Console - Opsional)
   * `80` & `443` (Jika menggunakan reverse proxy Nginx / Caddy untuk domain HTTPS)
@@ -62,7 +62,7 @@ MINIO_BUCKET_SPOTS=fishing-spots
 MINIO_BUCKET_EVENTS=event-covers
 
 BACKEND_PORT=8080
-FRONTEND_PORT=3080
+FRONTEND_PORT=3003
 
 JWT_SECRET=buat_kunci_jwt_panjang_minimal_32_karakter_acak
 ```
@@ -151,12 +151,12 @@ Response yang diharapkan:
 
 ### 2. Test Frontend
 ```bash
-curl -I http://localhost:3080/
+curl -I http://localhost:3003/
 ```
 Response yang diharapkan: `HTTP/1.1 200 OK`.
 
 ### 3. Akses via Browser Pengguna:
-* **Web Utama**: `http://<IP_VPS>:3080`
+* **Web Utama**: `http://<IP_VPS>:3003` (atau domain)
 * **API Version**: `http://<IP_VPS>:8080/api/v1/version`
 * **MinIO Console**: `http://<IP_VPS>:9001` (Login menggunakan `MINIO_ROOT_USER` dan `MINIO_ROOT_PASSWORD`)
 
