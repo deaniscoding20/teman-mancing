@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -18,11 +18,20 @@ import {
   X,
 } from "lucide-react";
 import { fetchApi } from "@/lib/api-client";
-import { setAuth } from "@/lib/auth";
+import { setAuth, getToken, getStoredUser } from "@/lib/auth";
 import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 
 export default function RegisterPage() {
   const router = useRouter();
+
+  // If user is already authenticated, redirect to home immediately
+  useEffect(() => {
+    const token = getToken();
+    const user = getStoredUser();
+    if (token && user) {
+      router.replace("/");
+    }
+  }, [router]);
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");

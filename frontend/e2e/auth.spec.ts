@@ -51,4 +51,21 @@ test.describe("Authentication Flows (Login & Register UI)", () => {
     const submitBtn = page.locator("button[type='submit']").first();
     await expect(submitBtn).toBeVisible();
   });
+
+  test("user yang sudah login otomatis dialihkan dari halaman register dan login", async ({ page }) => {
+    // Inject mock session
+    await page.addInitScript(() => {
+      localStorage.setItem("teman_mancing_token", "mock-token-for-e2e-test");
+      localStorage.setItem(
+        "teman_mancing_user",
+        JSON.stringify({ id: "123", name: "Logged User", username: "loggeduser", is_verified: true })
+      );
+    });
+
+    await page.goto("/register");
+    await expect(page).toHaveURL(/^(?!.*\/register).*$/);
+
+    await page.goto("/login");
+    await expect(page).toHaveURL(/^(?!.*\/login).*$/);
+  });
 });
