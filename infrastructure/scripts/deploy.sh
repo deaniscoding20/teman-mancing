@@ -34,8 +34,8 @@ fi
 # 2. Build & Deploy Docker Containers
 echo "🐳 Menjalankan Docker Compose build & start..."
 cd "${DOCKER_DIR}"
-docker compose down --remove-orphans || true
-docker compose up -d --build
+docker compose build
+docker compose up -d --remove-orphans
 
 # 3. Tunggu hingga database PostgreSQL dan MinIO siap (Healthy)
 echo "⏳ Menunggu container PostgreSQL dan MinIO mencapai status healthy..."
@@ -65,26 +65,31 @@ echo "✅ Migrasi database selesai diaplikasikan."
 echo "🔍 Melakukan verifikasi endpoint aplikasi..."
 sleep 3
 
+BACKEND_PORT_VAL=$(grep -E "^BACKEND_PORT=" "${DOCKER_DIR}/.env" 2>/dev/null | cut -d'=' -f2 | tr -d ' "\r' || true)
+BACKEND_PORT_VAL="${BACKEND_PORT_VAL:-8080}"
+FRONTEND_PORT_VAL=$(grep -E "^FRONTEND_PORT=" "${DOCKER_DIR}/.env" 2>/dev/null | cut -d'=' -f2 | tr -d ' "\r' || true)
+FRONTEND_PORT_VAL="${FRONTEND_PORT_VAL:-3003}"
+
 # Test Backend API Health
-BACKEND_HEALTH_URL="http://localhost:8080/api/v1/health"
+BACKEND_HEALTH_URL="http://localhost:${BACKEND_PORT_VAL}/api/v1/health"
 HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${BACKEND_HEALTH_URL}" || echo "000")
 if [ "${HTTP_STATUS}" -eq 200 ] || [ "${HTTP_STATUS}" -eq 503 ]; then
-  echo "✅ Backend API responsif di port 8080 (HTTP ${HTTP_STATUS})"
+  echo "✅ Backend API responsif di port ${BACKEND_PORT_VAL} (HTTP ${HTTP_STATUS})"
 else
   echo "⚠️ Peringatan: Backend API mengembalikan HTTP ${HTTP_STATUS} pada ${BACKEND_HEALTH_URL}"
 fi
 
 # Test Frontend HTTP response
-FRONTEND_URL="http://localhost:3080/"
+FRONTEND_URL="http://localhost:${FRONTEND_PORT_VAL}/"
 FRONTEND_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${FRONTEND_URL}" || echo "000")
 if [ "${FRONTEND_STATUS}" -eq 200 ]; then
-  echo "✅ Frontend Web responsif di port 3080 (HTTP 200)"
+  echo "✅ Frontend Web responsif di port ${FRONTEND_PORT_VAL} (HTTP 200)"
 else
   echo "⚠️ Peringatan: Frontend mengembalikan HTTP ${FRONTEND_STATUS} pada ${FRONTEND_URL}"
 fi
 
 echo "=========================================================="
 echo "🎉 Deployment Teman Mancing Berhasil Selesai!"
-echo "🌐 Frontend: http://localhost:3080"
-echo "🔌 API:      http://localhost:8080/api/v1"
+echo "🌐 Frontend: http://localhost:${FRONTEND_PORT_VAL}"
+echo "🔌 API:      http://localhost:${BACKEND_PORT_VAL}/api/v1"
 echo "=========================================================="

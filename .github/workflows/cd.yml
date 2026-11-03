@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 concurrency:
   group: cd-production
@@ -76,14 +77,17 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME || 'root' }}
+          username: ${{ secrets.VPS_USERNAME || secrets.VPS_USER || 'ubuntu' }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
           script_stop: true
           script: |
             echo "🚀 [CI/CD] Starting Auto-Deployment on VPS..."
             
-            DEPLOY_PATH="${{ secrets.VPS_DEPLOY_PATH || '/opt/teman-mancing' }}"
+            DEPLOY_PATH="${{ secrets.VPS_DEPLOY_PATH || '/home/ubuntu/apps/teman-mancing' }}"
+            if [ ! -d "$DEPLOY_PATH" ]; then
+              DEPLOY_PATH="$HOME/apps/teman-mancing"
+            fi
             if [ ! -d "$DEPLOY_PATH" ]; then
               DEPLOY_PATH="$HOME/teman-mancing"
             fi

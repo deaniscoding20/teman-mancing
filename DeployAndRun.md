@@ -286,7 +286,7 @@ Untuk mengaktifkan auto-deploy ke VPS, tambahkan secrets berikut di repository G
 | `VPS_USERNAME` | User SSH pada VPS | `root` atau `ubuntu` |
 | `VPS_SSH_KEY` | Private SSH Key (ed25519 / RSA) untuk akses ke VPS | `-----BEGIN OPENSSH PRIVATE KEY----- ...` |
 | `VPS_PORT` | Port SSH VPS (Opsional, default 22) | `22` |
-| `VPS_DEPLOY_PATH` | Lokasi folder project di VPS (Opsional) | `/opt/teman-mancing` |
+| `VPS_DEPLOY_PATH` | Lokasi folder project di VPS (Opsional) | `/home/ubuntu/apps/teman-mancing` |
 
 ---
 
