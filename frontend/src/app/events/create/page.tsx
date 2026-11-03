@@ -114,9 +114,21 @@ export default function CreateEventPage() {
 
         {/* Error notification */}
         {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-700 text-sm">
-            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-            <span>{error}</span>
+          <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex flex-col gap-2 text-red-700 text-sm">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-red-600" />
+              <span>{error}</span>
+            </div>
+            {error.toLowerCase().includes("verifikasi") && (
+              <div className="mt-1 pl-8">
+                <Link
+                  href="/verify-email"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-primary text-white text-xs font-bold rounded-lg hover:bg-brand-primary/90 transition shadow-xs"
+                >
+                  Verifikasi Email Sekarang →
+                </Link>
+              </div>
+            )}
           </div>
         )}
 

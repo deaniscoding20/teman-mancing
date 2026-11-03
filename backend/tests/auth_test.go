@@ -89,7 +89,7 @@ func TestAuthFlow(t *testing.T) {
 		t.Errorf("expected status 409 Conflict for duplicate registration, got %d", wDup.Code)
 	}
 
-	// 3. Login before email verification -> 403 Forbidden
+	// 3. Login before email verification -> 200 OK (access to browse web permitted, is_verified=false)
 	loginPayload := auth.LoginInput{
 		Email:    "budi@example.com",
 		Password: "password123",
@@ -100,16 +100,33 @@ func TestAuthFlow(t *testing.T) {
 	wLog := httptest.NewRecorder()
 	router.ServeHTTP(wLog, reqLog)
 
-	if wLog.Code != http.StatusForbidden {
-		t.Fatalf("expected status 403 Forbidden before email verification, got %d", wLog.Code)
+	if wLog.Code != http.StatusOK {
+		t.Fatalf("expected status 200 OK on login before email verification, got %d", wLog.Code)
 	}
 
-	// 3a. Verify Email
+	// 3a. Mutating action before email verification -> 403 Forbidden
+	testBio := "Pemancing pemula"
+	updPrePayload := map[string]string{
+		"name": "Budi S",
+		"bio":  testBio,
+	}
+	updPreBody, _ := json.Marshal(updPrePayload)
+	reqUpdPre, _ := http.NewRequest(http.MethodPatch, "/api/v1/users/me", bytes.NewBuffer(updPreBody))
+	reqUpdPre.Header.Set("Authorization", "Bearer "+token)
+	reqUpdPre.Header.Set("Content-Type", "application/json")
+	wUpdPre := httptest.NewRecorder()
+	router.ServeHTTP(wUpdPre, reqUpdPre)
+
+	if wUpdPre.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403 Forbidden on action before email verification, got %d: %s", wUpdPre.Code, wUpdPre.Body.String())
+	}
+
+	// 3b. Verify Email
 	u, _ := userRepo.GetByEmail(nil, "budi@example.com")
 	u.IsVerified = true
 	_ = userRepo.Update(nil, u)
 
-	// 3b. Login after email verification -> 200 OK
+	// 3c. Login after email verification -> 200 OK
 	reqLog2, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewBuffer(lBody))
 	reqLog2.Header.Set("Content-Type", "application/json")
 	wLog2 := httptest.NewRecorder()
@@ -118,7 +135,7 @@ func TestAuthFlow(t *testing.T) {
 		t.Fatalf("expected status 200 OK on login after verification, got %d: %s", wLog2.Code, wLog2.Body.String())
 	}
 
-	// 3c. Verify Cookie was set on login
+	// 3d. Verify Cookie was set on login
 	cookies := wLog2.Result().Cookies()
 	var authCookieFound bool
 	for _, cookie := range cookies {

@@ -31,6 +31,8 @@ export function getStoredUser(): any | null {
   return null;
 }
 
+export const getCurrentUser = getStoredUser;
+
 export function clearAuth() {
   if (typeof window !== "undefined") {
     localStorage.removeItem(TOKEN_KEY);

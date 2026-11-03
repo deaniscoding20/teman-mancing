@@ -194,6 +194,11 @@ function ChatContent() {
     const activeToken = token || getToken();
     if (!activeToken || !activeConv || !inputText.trim() || sending) return;
 
+    if (currentUser && !currentUser.is_verified) {
+      alert("Akun Anda belum diverifikasi. Silakan periksa email Anda untuk verifikasi sebelum mengirim pesan.");
+      return;
+    }
+
     const textToSend = inputText.trim();
     setSending(true);
 

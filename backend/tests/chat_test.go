@@ -55,6 +55,8 @@ func setupChatTestRouter() (http.Handler, string, string, string, string, string
 		Email:    "alice@example.com",
 		Password: "password123",
 	})
+	u1.User.IsVerified = true
+	_ = userRepo.Update(nil, u1.User)
 
 	u2, _ := authService.Register(nil, auth.RegisterInput{
 		Name:     "Angler Bob",
@@ -62,6 +64,8 @@ func setupChatTestRouter() (http.Handler, string, string, string, string, string
 		Email:    "bob@example.com",
 		Password: "password123",
 	})
+	u2.User.IsVerified = true
+	_ = userRepo.Update(nil, u2.User)
 
 	u3, _ := authService.Register(nil, auth.RegisterInput{
 		Name:     "Intruder Chuck",
@@ -69,6 +73,8 @@ func setupChatTestRouter() (http.Handler, string, string, string, string, string
 		Email:    "chuck@example.com",
 		Password: "password123",
 	})
+	u3.User.IsVerified = true
+	_ = userRepo.Update(nil, u3.User)
 
 	return router, u1.Token, u1.User.ID.String(), u2.Token, u2.User.ID.String(), u3.Token
 }

@@ -149,6 +149,9 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 		// Public Media / Storage Proxy
 		v1.GET("/media/:bucket/*objectKey", mediaHandler.ServeMedia)
 
+		authMiddleware := middleware.RequireAuth(tokenService)
+		verifiedMiddleware := middleware.RequireVerified(userRepo)
+
 		// Auth Routes (README Section 13)
 		authGroup := v1.Group("/auth")
 		{
@@ -162,73 +165,73 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 			authGroup.GET("/google/login", authHandler.GoogleOAuthRedirect)
 			authGroup.GET("/google/callback", authHandler.GoogleOAuthCallback)
 			authGroup.POST("/logout", authHandler.Logout)
-			authGroup.GET("/me", middleware.RequireAuth(tokenService), authHandler.GetMe)
+			authGroup.GET("/me", authMiddleware, authHandler.GetMe)
 		}
 
 		// User Routes (README Section 13)
 		userGroup := v1.Group("/users")
 		{
 			userGroup.GET("/:username", userHandler.GetByUsername)
-			userGroup.PATCH("/me", middleware.RequireAuth(tokenService), userHandler.UpdateProfile)
-			userGroup.POST("/me/avatar", middleware.RequireAuth(tokenService), userHandler.UploadAvatar)
+			userGroup.PATCH("/me", authMiddleware, verifiedMiddleware, userHandler.UpdateProfile)
+			userGroup.POST("/me/avatar", authMiddleware, verifiedMiddleware, userHandler.UploadAvatar)
 		}
 
 		// Fishing Spots Routes (README Section 13)
 		spotsGroup := v1.Group("/spots")
 		{
 			spotsGroup.GET("", spotHandler.List)
-			spotsGroup.POST("", middleware.RequireAuth(tokenService), spotHandler.Create)
+			spotsGroup.POST("", authMiddleware, verifiedMiddleware, spotHandler.Create)
 			spotsGroup.GET("/:id", spotHandler.GetByID)
-			spotsGroup.PATCH("/:id", middleware.RequireAuth(tokenService), spotHandler.Update)
-			spotsGroup.DELETE("/:id", middleware.RequireAuth(tokenService), spotHandler.Delete)
-			spotsGroup.POST("/:id/photos", middleware.RequireAuth(tokenService), spotHandler.UploadPhoto)
-			spotsGroup.DELETE("/:id/photos/:photoId", middleware.RequireAuth(tokenService), spotHandler.DeletePhoto)
+			spotsGroup.PATCH("/:id", authMiddleware, verifiedMiddleware, spotHandler.Update)
+			spotsGroup.DELETE("/:id", authMiddleware, verifiedMiddleware, spotHandler.Delete)
+			spotsGroup.POST("/:id/photos", authMiddleware, verifiedMiddleware, spotHandler.UploadPhoto)
+			spotsGroup.DELETE("/:id/photos/:photoId", authMiddleware, verifiedMiddleware, spotHandler.DeletePhoto)
 
 			// Comments
 			spotsGroup.GET("/:id/comments", spotHandler.ListComments)
-			spotsGroup.POST("/:id/comments", middleware.RequireAuth(tokenService), spotHandler.CreateComment)
+			spotsGroup.POST("/:id/comments", authMiddleware, verifiedMiddleware, spotHandler.CreateComment)
 		}
 
 		// Comments direct endpoint (README Section 13)
-		v1.DELETE("/comments/:id", middleware.RequireAuth(tokenService), spotHandler.DeleteComment)
+		v1.DELETE("/comments/:id", authMiddleware, verifiedMiddleware, spotHandler.DeleteComment)
 
 		// Events Routes (README Section 13)
 		eventsGroup := v1.Group("/events")
 		{
 			eventsGroup.GET("", eventHandler.List)
-			eventsGroup.POST("", middleware.RequireAuth(tokenService), eventHandler.Create)
+			eventsGroup.POST("", authMiddleware, verifiedMiddleware, eventHandler.Create)
 			eventsGroup.GET("/:id", eventHandler.GetByID)
-			eventsGroup.PATCH("/:id", middleware.RequireAuth(tokenService), eventHandler.Update)
-			eventsGroup.DELETE("/:id", middleware.RequireAuth(tokenService), eventHandler.Delete)
+			eventsGroup.PATCH("/:id", authMiddleware, verifiedMiddleware, eventHandler.Update)
+			eventsGroup.DELETE("/:id", authMiddleware, verifiedMiddleware, eventHandler.Delete)
 
 			// Join / Leave
-			eventsGroup.POST("/:id/join", middleware.RequireAuth(tokenService), eventHandler.Join)
-			eventsGroup.POST("/:id/leave", middleware.RequireAuth(tokenService), eventHandler.Leave)
+			eventsGroup.POST("/:id/join", authMiddleware, verifiedMiddleware, eventHandler.Join)
+			eventsGroup.POST("/:id/leave", authMiddleware, verifiedMiddleware, eventHandler.Leave)
 
 			// Manage Requests
-			eventsGroup.GET("/:id/requests", middleware.RequireAuth(tokenService), eventHandler.ListRequests)
-			eventsGroup.POST("/:id/requests/:userId/approve", middleware.RequireAuth(tokenService), eventHandler.ApproveRequest)
-			eventsGroup.POST("/:id/requests/:userId/reject", middleware.RequireAuth(tokenService), eventHandler.RejectRequest)
+			eventsGroup.GET("/:id/requests", authMiddleware, eventHandler.ListRequests)
+			eventsGroup.POST("/:id/requests/:userId/approve", authMiddleware, verifiedMiddleware, eventHandler.ApproveRequest)
+			eventsGroup.POST("/:id/requests/:userId/reject", authMiddleware, verifiedMiddleware, eventHandler.RejectRequest)
 		}
 
 		// Conversations & Chat Routes (README Section 13)
 		chatGroup := v1.Group("/conversations")
 		{
-			chatGroup.GET("", middleware.RequireAuth(tokenService), chatHandler.ListConversations)
-			chatGroup.POST("", middleware.RequireAuth(tokenService), chatHandler.CreateConversation)
-			chatGroup.GET("/:id/messages", middleware.RequireAuth(tokenService), chatHandler.ListMessages)
-			chatGroup.POST("/:id/messages", middleware.RequireAuth(tokenService), chatHandler.SendMessage)
+			chatGroup.GET("", authMiddleware, chatHandler.ListConversations)
+			chatGroup.POST("", authMiddleware, verifiedMiddleware, chatHandler.CreateConversation)
+			chatGroup.GET("/:id/messages", authMiddleware, chatHandler.ListMessages)
+			chatGroup.POST("/:id/messages", authMiddleware, verifiedMiddleware, chatHandler.SendMessage)
 		}
 
 		// Realtime WebSocket Endpoint (README Section 13 & 9.4)
-		v1.GET("/ws", middleware.RequireAuth(tokenService), chatHandler.WebSocket)
+		v1.GET("/ws", authMiddleware, chatHandler.WebSocket)
 
 		// Notifications Routes (README Section 13)
 		notifGroup := v1.Group("/notifications")
 		{
-			notifGroup.GET("", middleware.RequireAuth(tokenService), notifHandler.List)
-			notifGroup.PATCH("/:id/read", middleware.RequireAuth(tokenService), notifHandler.MarkAsRead)
-			notifGroup.POST("/read-all", middleware.RequireAuth(tokenService), notifHandler.MarkAllAsRead)
+			notifGroup.GET("", authMiddleware, notifHandler.List)
+			notifGroup.PATCH("/:id/read", authMiddleware, notifHandler.MarkAsRead)
+			notifGroup.POST("/read-all", authMiddleware, notifHandler.MarkAllAsRead)
 		}
 	}
 

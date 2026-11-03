@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	appuser "teman-mancing/backend/internal/application/user"
 	"teman-mancing/backend/internal/delivery/http/dto"
 	"teman-mancing/backend/internal/infrastructure/security"
 )
@@ -79,4 +80,35 @@ func GetAuthUsername(c *gin.Context) (string, bool) {
 	}
 	name, ok := val.(string)
 	return name, ok
+}
+
+// RequireVerified ensures that the authenticated user has verified their email before performing mutating actions.
+func RequireVerified(userRepo appuser.Repository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, ok := GetAuthUserID(c)
+		if !ok {
+			dto.Error(c, http.StatusUnauthorized, "Sesi autentikasi tidak ditemukan")
+			c.Abort()
+			return
+		}
+
+		u, err := userRepo.GetByID(c.Request.Context(), userID)
+		if err != nil || u == nil {
+			dto.Error(c, http.StatusUnauthorized, "Pengguna tidak ditemukan")
+			c.Abort()
+			return
+		}
+
+		if !u.IsVerified {
+			c.JSON(http.StatusForbidden, gin.H{
+				"success":               false,
+				"message":               "Aksi ini memerlukan verifikasi email. Silakan periksa email Anda atau lakukan verifikasi untuk mengaktifkan seluruh fitur interaksi.",
+				"requires_verification": true,
+			})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
 }

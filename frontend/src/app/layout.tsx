@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import EmailVerificationBanner from "@/components/layout/EmailVerificationBanner";
 
 export const metadata: Metadata = {
   title: "Teman Mancing — Cari Spot. Cari Teman. Gas Mancing!",
@@ -16,6 +17,7 @@ export default function RootLayout({
   return (
     <html lang="id">
       <body className="flex flex-col min-h-screen bg-brand-background text-brand-text antialiased">
+        <EmailVerificationBanner />
         <Navbar />
         <main className="flex-1">
           {children}
