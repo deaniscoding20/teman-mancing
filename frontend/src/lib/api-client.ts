@@ -62,3 +62,16 @@ export async function fetchApi<T = any>(
 
   return data as ApiResponse<T>;
 }
+
+export function resolveMediaUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+    return url;
+  }
+  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1";
+  if (url.startsWith("/api/v1")) {
+    const origin = base.replace(/\/api\/v1\/?$/, "");
+    return `${origin}${url}`;
+  }
+  return `${base.replace(/\/$/, "")}/${url.replace(/^\//, "")}`;
+}

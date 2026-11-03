@@ -180,6 +180,26 @@ func (s *AuthService) GetUserByUsername(ctx context.Context, username string) (*
 	return u, nil
 }
 
+func (s *AuthService) GetUserProfileByUsername(ctx context.Context, username string) (*appuser.UserProfileView, error) {
+	u, err := s.userRepo.GetByUsername(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+	if u == nil {
+		return nil, common.ErrNotFound
+	}
+	view, err := s.userRepo.GetProfileView(ctx, u.ID)
+	if err != nil {
+		return nil, err
+	}
+	if view == nil {
+		return &appuser.UserProfileView{
+			User: u,
+		}, nil
+	}
+	return view, nil
+}
+
 func (s *AuthService) UpdateProfile(ctx context.Context, userID uuid.UUID, input UpdateProfileInput) (*domainuser.User, error) {
 	u, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
