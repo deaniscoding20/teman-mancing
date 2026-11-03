@@ -1,4 +1,5 @@
 import { ApiResponse, ApiErrorResponse } from "@/types/api";
+import { getToken } from "./auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1";
 
@@ -25,12 +26,35 @@ export async function fetchApi<T = any>(
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  // Auto attach Bearer token if not explicitly provided
+  const token = getToken();
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
 
-  const data = await response.json();
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      credentials: "include",
+      ...options,
+      headers,
+    });
+  } catch (err: any) {
+    throw new ApiClientError(0, {
+      success: false,
+      message: "Tidak dapat terhubung ke server. Pastikan backend aktif.",
+    });
+  }
+
+  let data: any;
+  try {
+    data = await response.json();
+  } catch (err) {
+    throw new ApiClientError(response.status, {
+      success: false,
+      message: `Server mengembalikan response tidak valid (HTTP ${response.status})`,
+    });
+  }
 
   if (!response.ok || !data.success) {
     throw new ApiClientError(response.status, data);

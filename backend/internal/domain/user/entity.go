@@ -13,6 +13,7 @@ var (
 	ErrInvalidEmail    = errors.New("invalid email address")
 	ErrInvalidUsername = errors.New("username must be 3-30 characters alphanumeric")
 	ErrPasswordTooWeak = errors.New("password must be at least 8 characters")
+	ErrPasswordTooLong = errors.New("password cannot exceed 72 characters")
 )
 
 // User represents a user account and profile in Teman Mancing.
@@ -46,6 +47,9 @@ func NewUser(name, username, email, rawPassword string) (*User, error) {
 	}
 	if len(rawPassword) < 8 {
 		return nil, ErrPasswordTooWeak
+	}
+	if len(rawPassword) > 72 {
+		return nil, ErrPasswordTooLong
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)

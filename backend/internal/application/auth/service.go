@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 
 	"teman-mancing/backend/internal/application/common"
 	appuser "teman-mancing/backend/internal/application/user"
@@ -16,7 +17,8 @@ import (
 var (
 	ErrEmailExists    = errors.New("email is already registered")
 	ErrUsernameExists = errors.New("username is already taken")
-	ErrInvalidAuth    = errors.New("invalid email or password")
+	ErrInvalidAuth    = errors.New("email/username atau password salah")
+	dummyBcryptHash, _ = bcrypt.GenerateFromPassword([]byte("dummy-auth-salt-constant-time"), bcrypt.DefaultCost)
 )
 
 type RegisterInput struct {
@@ -27,8 +29,10 @@ type RegisterInput struct {
 }
 
 type LoginInput struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Identifier string `json:"identifier"`
+	Email      string `json:"email"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
 }
 
 type AuthResult struct {
@@ -95,13 +99,47 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*AuthR
 }
 
 func (s *AuthService) Login(ctx context.Context, input LoginInput) (*AuthResult, error) {
-	cleanEmail := strings.ToLower(strings.TrimSpace(input.Email))
-
-	u, err := s.userRepo.GetByEmail(ctx, cleanEmail)
-	if err != nil {
-		return nil, err
+	identifier := strings.TrimSpace(input.Identifier)
+	if identifier == "" {
+		identifier = strings.TrimSpace(input.Email)
 	}
+	if identifier == "" {
+		identifier = strings.TrimSpace(input.Username)
+	}
+
+	if identifier == "" {
+		return nil, errors.New("email atau username wajib diisi")
+	}
+	if input.Password == "" {
+		return nil, errors.New("password wajib diisi")
+	}
+
+	cleanIdentifier := strings.ToLower(identifier)
+	var u *domainuser.User
+	var err error
+
+	// Support login by email OR username
+	if strings.Contains(cleanIdentifier, "@") {
+		u, err = s.userRepo.GetByEmail(ctx, cleanIdentifier)
+		if err != nil {
+			return nil, err
+		}
+		if u == nil {
+			u, _ = s.userRepo.GetByUsername(ctx, cleanIdentifier)
+		}
+	} else {
+		u, err = s.userRepo.GetByUsername(ctx, cleanIdentifier)
+		if err != nil {
+			return nil, err
+		}
+		if u == nil {
+			u, _ = s.userRepo.GetByEmail(ctx, cleanIdentifier)
+		}
+	}
+
+	// Constant-time execution against timing attacks (user enumeration)
 	if u == nil {
+		_ = bcrypt.CompareHashAndPassword(dummyBcryptHash, []byte(input.Password))
 		return nil, ErrInvalidAuth
 	}
 

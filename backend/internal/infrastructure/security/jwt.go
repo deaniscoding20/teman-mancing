@@ -30,6 +30,10 @@ func NewTokenService(secretKey string, expirationDur time.Duration) *TokenServic
 	}
 }
 
+func (s *TokenService) ExpirationDuration() time.Duration {
+	return s.expirationDur
+}
+
 // GenerateToken issues a signed JWT token for an authenticated user.
 func (s *TokenService) GenerateToken(userID uuid.UUID, username string) (string, error) {
 	now := time.Now().UTC()

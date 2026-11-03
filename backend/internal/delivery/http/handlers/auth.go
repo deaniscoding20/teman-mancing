@@ -27,8 +27,10 @@ type RegisterRequest struct {
 }
 
 type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
+	Identifier string `json:"identifier"`
+	Email      string `json:"email"`
+	Username   string `json:"username"`
+	Password   string `json:"password" binding:"required"`
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
@@ -66,30 +68,55 @@ func (h *AuthHandler) Register(c *gin.Context) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		dto.Error(c, http.StatusBadRequest, "Invalid login credentials format", dto.FieldError{
+		dto.Error(c, http.StatusBadRequest, "Format login tidak valid", dto.FieldError{
 			Field:   "validation",
 			Message: err.Error(),
 		})
 		return
 	}
 
-	result, err := h.authService.Login(c.Request.Context(), auth.LoginInput{
-		Email:    req.Email,
-		Password: req.Password,
-	})
-	if err != nil {
-		if errors.Is(err, auth.ErrInvalidAuth) {
-			dto.Error(c, http.StatusUnauthorized, "Invalid email or password")
-			return
-		}
-		dto.Error(c, http.StatusInternalServerError, "An unexpected login error occurred")
+	ident := req.Identifier
+	if ident == "" {
+		ident = req.Email
+	}
+	if ident == "" {
+		ident = req.Username
+	}
+
+	if ident == "" {
+		dto.Error(c, http.StatusBadRequest, "Email atau username wajib diisi", dto.FieldError{
+			Field:   "identifier",
+			Message: "Email atau username tidak boleh kosong",
+		})
 		return
 	}
 
-	dto.Success(c, http.StatusOK, "Login successful", result)
+	result, err := h.authService.Login(c.Request.Context(), auth.LoginInput{
+		Identifier: ident,
+		Email:      req.Email,
+		Username:   req.Username,
+		Password:   req.Password,
+	})
+	if err != nil {
+		if errors.Is(err, auth.ErrInvalidAuth) {
+			dto.Error(c, http.StatusUnauthorized, "Email/username atau password salah. Pastikan kredensial Anda benar.")
+			return
+		}
+		dto.Error(c, http.StatusInternalServerError, "Terjadi kesalahan internal saat login")
+		return
+	}
+
+	// Set HttpOnly session cookie
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("teman_mancing_token", result.Token, 86400*7, "/", "", false, true)
+
+	dto.Success(c, http.StatusOK, "Login berhasil", result)
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
+	// Clear session cookie
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("teman_mancing_token", "", -1, "/", "", false, true)
 	dto.Success(c, http.StatusOK, "Logged out successfully", nil)
 }
 

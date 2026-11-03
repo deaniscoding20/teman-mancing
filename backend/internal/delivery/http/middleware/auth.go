@@ -19,24 +19,31 @@ const (
 // RequireAuth ensures that the incoming request contains a valid Bearer JWT.
 func RequireAuth(tokenService *security.TokenService) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		tokenStr := ""
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			dto.Error(c, http.StatusUnauthorized, "Missing Authorization header")
+		if authHeader != "" {
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+				tokenStr = strings.TrimSpace(parts[1])
+			}
+		}
+
+		// Fallback to cookie
+		if tokenStr == "" {
+			if cookieVal, err := c.Cookie("teman_mancing_token"); err == nil && cookieVal != "" {
+				tokenStr = strings.TrimSpace(cookieVal)
+			}
+		}
+
+		if tokenStr == "" {
+			dto.Error(c, http.StatusUnauthorized, "Sesi tidak ditemukan atau header otorisasi hilang")
 			c.Abort()
 			return
 		}
 
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-			dto.Error(c, http.StatusUnauthorized, "Invalid Authorization header format. Expected 'Bearer <token>'")
-			c.Abort()
-			return
-		}
-
-		tokenStr := strings.TrimSpace(parts[1])
 		claims, err := tokenService.ValidateToken(tokenStr)
 		if err != nil {
-			dto.Error(c, http.StatusUnauthorized, "Invalid or expired token")
+			dto.Error(c, http.StatusUnauthorized, "Token otorisasi tidak valid atau telah kedaluwarsa")
 			c.Abort()
 			return
 		}

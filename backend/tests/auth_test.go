@@ -99,6 +99,49 @@ func TestAuthFlow(t *testing.T) {
 		t.Fatalf("expected status 200 OK on login, got %d", wLog.Code)
 	}
 
+	// 3b. Verify Cookie was set on login
+	cookies := wLog.Result().Cookies()
+	var authCookieFound bool
+	for _, cookie := range cookies {
+		if cookie.Name == "teman_mancing_token" && cookie.Value != "" && cookie.HttpOnly {
+			authCookieFound = true
+			break
+		}
+	}
+	if !authCookieFound {
+		t.Errorf("expected HttpOnly cookie teman_mancing_token to be set on login")
+	}
+
+	// 3c. Login using Username ("budimancing")
+	uLoginPayload := map[string]string{
+		"identifier": "budimancing",
+		"password":   "password123",
+	}
+	uLBody, _ := json.Marshal(uLoginPayload)
+	reqULog, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewBuffer(uLBody))
+	reqULog.Header.Set("Content-Type", "application/json")
+	wULog := httptest.NewRecorder()
+	router.ServeHTTP(wULog, reqULog)
+
+	if wULog.Code != http.StatusOK {
+		t.Fatalf("expected status 200 OK on login by username, got %d: %s", wULog.Code, wULog.Body.String())
+	}
+
+	// 3d. Login with wrong password -> 401
+	wrongPwdPayload := map[string]string{
+		"identifier": "budimancing",
+		"password":   "wrong-password",
+	}
+	wpBody, _ := json.Marshal(wrongPwdPayload)
+	reqWp, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewBuffer(wpBody))
+	reqWp.Header.Set("Content-Type", "application/json")
+	wWp := httptest.NewRecorder()
+	router.ServeHTTP(wWp, reqWp)
+
+	if wWp.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 Unauthorized for wrong password, got %d", wWp.Code)
+	}
+
 	// 4. Access Protected /api/v1/auth/me without token -> 401
 	reqMeNoAuth, _ := http.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
 	wMeNoAuth := httptest.NewRecorder()
