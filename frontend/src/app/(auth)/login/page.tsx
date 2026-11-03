@@ -112,7 +112,19 @@ export default function LoginPage() {
               <span className="font-semibold leading-relaxed">{error}</span>
             </div>
 
-            {failedAttempts >= 1 && (
+            {error.toLowerCase().includes("verifikasi") && (
+              <div className="mt-2 pt-2 border-t border-red-200">
+                <Link
+                  href={`/verify-email?email=${encodeURIComponent(identifier)}`}
+                  className="w-full py-2 px-3 rounded-xl bg-brand-primary text-white text-xs font-bold hover:bg-brand-primary/90 transition flex items-center justify-center gap-1.5 shadow-xs"
+                >
+                  <span>Buka Halaman Verifikasi Email</span>
+                  <Fish className="w-3.5 h-3.5 text-brand-secondary" />
+                </Link>
+              </div>
+            )}
+
+            {failedAttempts >= 1 && !error.toLowerCase().includes("verifikasi") && (
               <div className="mt-1 pt-2 border-t border-red-200/80 text-[11px] text-red-700 space-y-1">
                 <p className="font-medium">Tips jika masih gagal masuk:</p>
                 <ul className="list-disc list-inside space-y-0.5 text-red-600/90 pl-1">
@@ -183,6 +195,14 @@ export default function LoginPage() {
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
+            </div>
+            <div className="flex justify-end mt-1.5">
+              <Link
+                href="/forgot-password"
+                className="text-xs font-semibold text-brand-secondary hover:underline"
+              >
+                Lupa kata sandi?
+              </Link>
             </div>
           </div>
 

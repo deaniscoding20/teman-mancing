@@ -28,4 +28,14 @@ type Repository interface {
 	GetByUsername(ctx context.Context, username string) (*user.User, error)
 	Update(ctx context.Context, u *user.User) error
 	GetProfileView(ctx context.Context, id uuid.UUID) (*UserProfileView, error)
+
+	CreateEmailVerification(ctx context.Context, v *user.EmailVerification) error
+	GetEmailVerificationByToken(ctx context.Context, token string) (*user.EmailVerification, error)
+	GetEmailVerificationByOTP(ctx context.Context, userID uuid.UUID, otp string) (*user.EmailVerification, error)
+	DeleteEmailVerification(ctx context.Context, id uuid.UUID) error
+
+	CreatePasswordReset(ctx context.Context, r *user.PasswordReset) error
+	GetPasswordResetByToken(ctx context.Context, token string) (*user.PasswordReset, error)
+	GetPasswordResetByOTP(ctx context.Context, email, otp string) (*user.PasswordReset, error)
+	MarkPasswordResetUsed(ctx context.Context, id uuid.UUID) error
 }

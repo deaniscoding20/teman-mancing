@@ -14,6 +14,7 @@ import (
 	"teman-mancing/backend/internal/delivery/http/handlers"
 	"teman-mancing/backend/internal/delivery/http/middleware"
 	"teman-mancing/backend/internal/infrastructure/database"
+	"teman-mancing/backend/internal/infrastructure/email"
 	"teman-mancing/backend/internal/infrastructure/security"
 	"teman-mancing/backend/internal/infrastructure/storage"
 	infraWS "teman-mancing/backend/internal/infrastructure/websocket"
@@ -21,13 +22,14 @@ import (
 
 // RouterDeps bundles router dependencies.
 type RouterDeps struct {
-	Config       *config.Config
-	Logger       *zap.Logger
-	DB           *database.PostgresDB
-	MinIO        *storage.MinIOClient
-	TokenService *security.TokenService
-	UserRepo     appuser.Repository
-	SpotRepo     appspot.Repository
+	Config           *config.Config
+	Logger           *zap.Logger
+	DB               *database.PostgresDB
+	MinIO            *storage.MinIOClient
+	Mailer           *email.Mailer
+	TokenService     *security.TokenService
+	UserRepo         appuser.Repository
+	SpotRepo         appspot.Repository
 	EventRepo        appevent.Repository
 	ChatRepo         appchat.Repository
 	NotificationRepo appnotif.Repository
@@ -113,8 +115,13 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 		tokenService = security.NewTokenService(deps.Config.JWTSecret, deps.Config.JWTExpiration)
 	}
 
-	authService := auth.NewAuthService(userRepo, tokenService)
-	authHandler := handlers.NewAuthHandler(authService)
+	authService := auth.NewAuthService(userRepo, tokenService, deps.Mailer)
+	authHandler := handlers.NewAuthHandler(
+		authService,
+		deps.Config.GoogleClientID,
+		deps.Config.GoogleClientSecret,
+		deps.Config.GoogleRedirectURL,
+	)
 	userHandler := handlers.NewUserHandler(authService, deps.MinIO)
 	mediaHandler := handlers.NewMediaHandler(deps.MinIO)
 
@@ -147,7 +154,13 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 		{
 			authGroup.POST("/register", authHandler.Register)
 			authGroup.POST("/login", authHandler.Login)
+			authGroup.POST("/verify-email", authHandler.VerifyEmail)
+			authGroup.POST("/resend-verification", authHandler.ResendVerification)
+			authGroup.POST("/forgot-password", authHandler.ForgotPassword)
+			authGroup.POST("/reset-password", authHandler.ResetPassword)
 			authGroup.POST("/google", authHandler.GoogleLogin)
+			authGroup.GET("/google/login", authHandler.GoogleOAuthRedirect)
+			authGroup.GET("/google/callback", authHandler.GoogleOAuthCallback)
 			authGroup.POST("/logout", authHandler.Logout)
 			authGroup.GET("/me", middleware.RequireAuth(tokenService), authHandler.GetMe)
 		}

@@ -19,6 +19,20 @@ test.describe("Authentication Flows (Login & Register UI)", () => {
     // Verifikasi link ke pendaftaran
     const registerLink = page.locator("a[href='/register']").first();
     await expect(registerLink).toBeVisible();
+
+    // Verifikasi link lupa password
+    const forgotPasswordLink = page.locator("a[href='/forgot-password']").first();
+    await expect(forgotPasswordLink).toBeVisible();
+  });
+
+  test("halaman forgot-password dan verify-email dapat diakses dengan baik", async ({ page }) => {
+    await page.goto("/forgot-password");
+    await expect(page.getByRole("heading", { name: /Lupa Kata Sandi/i })).toBeVisible();
+    await expect(page.getByPlaceholder(/nama@email\.com/i)).toBeVisible();
+
+    await page.goto("/verify-email");
+    await expect(page.getByRole("heading", { name: /Verifikasi Email/i })).toBeVisible();
+    await expect(page.getByPlaceholder("123456")).toBeVisible();
   });
 
   test("halaman register memiliki seluruh field pendaftaran", async ({ page }) => {

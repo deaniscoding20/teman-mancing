@@ -50,7 +50,7 @@ func setupNotificationTestRouter() (http.Handler, string, uuid.UUID, appnotif.Re
 		Version:          "1.0.0-test",
 	})
 
-	authService := auth.NewAuthService(userRepo, tokenService)
+	authService := auth.NewAuthService(userRepo, tokenService, nil)
 	u, _ := authService.Register(nil, auth.RegisterInput{
 		Name:     "Notif User",
 		Username: "notif_user",

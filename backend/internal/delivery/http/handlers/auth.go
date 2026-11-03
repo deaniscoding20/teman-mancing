@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 
@@ -12,11 +15,19 @@ import (
 )
 
 type AuthHandler struct {
-	authService *auth.AuthService
+	authService        *auth.AuthService
+	googleClientID     string
+	googleClientSecret string
+	googleRedirectURL  string
 }
 
-func NewAuthHandler(authService *auth.AuthService) *AuthHandler {
-	return &AuthHandler{authService: authService}
+func NewAuthHandler(authService *auth.AuthService, googleClientID, googleClientSecret, googleRedirectURL string) *AuthHandler {
+	return &AuthHandler{
+		authService:        authService,
+		googleClientID:     googleClientID,
+		googleClientSecret: googleClientSecret,
+		googleRedirectURL:  googleRedirectURL,
+	}
 }
 
 type RegisterRequest struct {
@@ -98,6 +109,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		Password:   req.Password,
 	})
 	if err != nil {
+		if errors.Is(err, auth.ErrEmailNotVerified) {
+			dto.Error(c, http.StatusForbidden, err.Error())
+			return
+		}
 		if errors.Is(err, auth.ErrInvalidAuth) {
 			dto.Error(c, http.StatusUnauthorized, "Email/username atau password salah. Pastikan kredensial Anda benar.")
 			return
@@ -171,4 +186,183 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 	}
 
 	dto.Success(c, http.StatusOK, "Profile retrieved successfully", profile)
+}
+
+type VerifyEmailRequest struct {
+	Token string `json:"token"`
+	Email string `json:"email"`
+	OTP   string `json:"otp"`
+}
+
+func (h *AuthHandler) VerifyEmail(c *gin.Context) {
+	var req VerifyEmailRequest
+	_ = c.ShouldBindJSON(&req)
+
+	token := req.Token
+	if token == "" {
+		token = c.Query("token")
+	}
+
+	result, err := h.authService.VerifyEmail(c.Request.Context(), token, req.Email, req.OTP)
+	if err != nil {
+		dto.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Set session cookie
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("teman_mancing_token", result.Token, 86400*7, "/", "", false, true)
+
+	dto.Success(c, http.StatusOK, "Email berhasil diverifikasi", result)
+}
+
+type ResendVerificationRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+func (h *AuthHandler) ResendVerification(c *gin.Context) {
+	var req ResendVerificationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		dto.Error(c, http.StatusBadRequest, "Format email tidak valid", dto.FieldError{
+			Field:   "email",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if err := h.authService.ResendVerificationEmail(c.Request.Context(), req.Email); err != nil {
+		dto.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	dto.Success(c, http.StatusOK, "Kode verifikasi baru telah dikirimkan ke email Anda", nil)
+}
+
+type ForgotPasswordRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var req ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		dto.Error(c, http.StatusBadRequest, "Format email tidak valid", dto.FieldError{
+			Field:   "email",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if err := h.authService.ForgotPassword(c.Request.Context(), req.Email); err != nil {
+		dto.Error(c, http.StatusInternalServerError, "Gagal memproses permintaan reset password")
+		return
+	}
+
+	dto.Success(c, http.StatusOK, "Instruksi dan kode reset password telah dikirim ke email Anda", nil)
+}
+
+type ResetPasswordRequest struct {
+	Token       string `json:"token"`
+	Email       string `json:"email"`
+	OTP         string `json:"otp"`
+	NewPassword string `json:"password" binding:"required,min=8"`
+}
+
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var req ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		dto.Error(c, http.StatusBadRequest, "Input reset password tidak valid", dto.FieldError{
+			Field:   "validation",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	token := req.Token
+	if token == "" {
+		token = c.Query("token")
+	}
+
+	if err := h.authService.ResetPassword(c.Request.Context(), token, req.Email, req.OTP, req.NewPassword); err != nil {
+		dto.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	dto.Success(c, http.StatusOK, "Kata sandi Anda berhasil diperbarui. Silakan login kembali.", nil)
+}
+
+// GET /api/v1/auth/google/login
+func (h *AuthHandler) GoogleOAuthRedirect(c *gin.Context) {
+	if h.googleClientID == "" {
+		dto.Error(c, http.StatusBadRequest, "Google Client ID belum dikonfigurasi di server")
+		return
+	}
+	redirectURI := h.googleRedirectURL
+	if redirectURI == "" {
+		redirectURI = "https://temanmancing.my.id/api/v1/auth/google/callback"
+	}
+	scope := url.QueryEscape("openid email profile")
+	googleAuthURL := fmt.Sprintf(
+		"https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&access_type=offline&prompt=select_account",
+		url.QueryEscape(h.googleClientID),
+		url.QueryEscape(redirectURI),
+		scope,
+	)
+	c.Redirect(http.StatusTemporaryRedirect, googleAuthURL)
+}
+
+// GET /api/v1/auth/google/callback
+func (h *AuthHandler) GoogleOAuthCallback(c *gin.Context) {
+	code := c.Query("code")
+	if code == "" {
+		c.Redirect(http.StatusTemporaryRedirect, "/login?error=Otorisasi+Google+dibatalkan")
+		return
+	}
+
+	tokenURL := "https://oauth2.googleapis.com/token"
+	redirectURI := h.googleRedirectURL
+	if redirectURI == "" {
+		redirectURI = "https://temanmancing.my.id/api/v1/auth/google/callback"
+	}
+
+	form := url.Values{
+		"code":          {code},
+		"client_id":     {h.googleClientID},
+		"client_secret": {h.googleClientSecret},
+		"redirect_uri":  {redirectURI},
+		"grant_type":    {"authorization_code"},
+	}
+
+	resp, err := http.PostForm(tokenURL, form)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		c.Redirect(http.StatusTemporaryRedirect, "/login?error=Gagal+menukar+kode+Google")
+		return
+	}
+	defer resp.Body.Close()
+
+	var tokResult struct {
+		AccessToken string `json:"access_token"`
+		IDToken     string `json:"id_token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tokResult); err != nil || tokResult.IDToken == "" {
+		c.Redirect(http.StatusTemporaryRedirect, "/login?error=Response+token+Google+tidak+valid")
+		return
+	}
+
+	authRes, err := h.authService.GoogleLogin(c.Request.Context(), auth.GoogleLoginInput{
+		IDToken: tokResult.IDToken,
+	})
+	if err != nil {
+		c.Redirect(http.StatusTemporaryRedirect, "/login?error="+url.QueryEscape(err.Error()))
+		return
+	}
+
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("teman_mancing_token", authRes.Token, 86400*7, "/", "", false, true)
+
+	userJSON, _ := json.Marshal(authRes.User)
+	c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf(
+		"/auth/callback?token=%s&user=%s",
+		url.QueryEscape(authRes.Token),
+		url.QueryEscape(string(userJSON)),
+	))
 }

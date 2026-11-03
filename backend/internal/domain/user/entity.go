@@ -18,16 +18,40 @@ var (
 
 // User represents a user account and profile in Teman Mancing.
 type User struct {
-	ID           uuid.UUID `json:"id"`
-	Name         string    `json:"name"`
-	Username     string    `json:"username"`
-	Email        string    `json:"email"`
-	PasswordHash string    `json:"-"`
-	AvatarKey    *string   `json:"avatar_key,omitempty"`
-	Bio          *string   `json:"bio,omitempty"`
-	Location     *string   `json:"location,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID              uuid.UUID  `json:"id"`
+	Name            string     `json:"name"`
+	Username        string     `json:"username"`
+	Email           string     `json:"email"`
+	PasswordHash    string     `json:"-"`
+	AvatarKey       *string    `json:"avatar_key,omitempty"`
+	Bio             *string    `json:"bio,omitempty"`
+	Location        *string    `json:"location,omitempty"`
+	IsVerified      bool       `json:"is_verified"`
+	EmailVerifiedAt *time.Time `json:"email_verified_at,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+}
+
+// EmailVerification represents an active verification OTP and token for email.
+type EmailVerification struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	OTPCode   string    `json:"otp_code"`
+	Token     string    `json:"token"`
+	ExpiresAt time.Time `json:"expires_at"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// PasswordReset represents a pending password reset request.
+type PasswordReset struct {
+	ID        uuid.UUID  `json:"id"`
+	UserID    uuid.UUID  `json:"user_id"`
+	Email     string     `json:"email"`
+	OTPCode   string     `json:"otp_code"`
+	Token     string     `json:"token"`
+	ExpiresAt time.Time  `json:"expires_at"`
+	UsedAt    *time.Time `json:"used_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
 }
 
 // NewUser creates a new User with validated fields and hashed password.

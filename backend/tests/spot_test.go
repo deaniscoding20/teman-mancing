@@ -43,7 +43,7 @@ func setupSpotTestRouter() (http.Handler, string, string) {
 		Version:      "1.0.0-test",
 	})
 
-	authService := auth.NewAuthService(userRepo, tokenService)
+	authService := auth.NewAuthService(userRepo, tokenService, nil)
 
 	// User 1
 	u1, _ := authService.Register(nil, auth.RegisterInput{

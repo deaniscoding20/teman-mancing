@@ -14,6 +14,7 @@ import (
 	"teman-mancing/backend/internal/config"
 	"teman-mancing/backend/internal/delivery/http/routes"
 	"teman-mancing/backend/internal/infrastructure/database"
+	"teman-mancing/backend/internal/infrastructure/email"
 	"teman-mancing/backend/internal/infrastructure/logger"
 	"teman-mancing/backend/internal/infrastructure/security"
 	"teman-mancing/backend/internal/infrastructure/storage"
@@ -75,8 +76,18 @@ func main() {
 		cancel()
 	}
 
-	// 5. Setup Token Service & Repositories
+	// 5. Setup Token Service, Mailer & Repositories
 	tokenService := security.NewTokenService(cfg.JWTSecret, cfg.JWTExpiration)
+	mailer := email.NewMailer(email.Config{
+		Host:        cfg.SMTPHost,
+		Port:        cfg.SMTPPort,
+		User:        cfg.SMTPUser,
+		Password:    cfg.SMTPPassword,
+		UseSSL:      cfg.SMTPUseSSL,
+		SenderEmail: cfg.SMTPSender,
+		SenderName:  cfg.SMTPSenderName,
+		BaseURL:     cfg.AppBaseURL,
+	}, log)
 
 	// 6. Setup Gin Router & Middlewares
 	router := routes.SetupRouter(routes.RouterDeps{
@@ -84,6 +95,7 @@ func main() {
 		Logger:       log,
 		DB:           dbConn,
 		MinIO:        minioClient,
+		Mailer:       mailer,
 		TokenService: tokenService,
 		Version:      AppVersion,
 	})
