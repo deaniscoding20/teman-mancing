@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -46,7 +47,9 @@ func (r *GormSpotRepository) List(ctx context.Context, filter appspot.ListSpotsF
 	for _, s := range spots {
 		var photo domainspot.Photo
 		if err := r.db.WithContext(ctx).Table("fishing_spot_photos").Where("spot_id = ?", s.ID).Order("is_primary DESC, created_at ASC").First(&photo).Error; err == nil {
+			photo.URL = fmt.Sprintf("/api/v1/media/fishing-spots/%s", photo.ObjectKey)
 			s.Photos = []domainspot.Photo{photo}
+			s.PrimaryPhotoURL = &photo.URL
 		}
 		var count int64
 		_ = r.db.WithContext(ctx).Table("spot_comments").Where("spot_id = ?", s.ID).Count(&count)
@@ -68,7 +71,13 @@ func (r *GormSpotRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain
 
 	// Fetch photos
 	var photos []domainspot.Photo
-	_ = r.db.WithContext(ctx).Table("fishing_spot_photos").Where("spot_id = ?", id).Find(&photos)
+	_ = r.db.WithContext(ctx).Table("fishing_spot_photos").Where("spot_id = ?", id).Order("is_primary DESC, created_at ASC").Find(&photos)
+	for i := range photos {
+		photos[i].URL = fmt.Sprintf("/api/v1/media/fishing-spots/%s", photos[i].ObjectKey)
+		if (photos[i].IsPrimary || spot.PrimaryPhotoURL == nil) && spot.PrimaryPhotoURL == nil {
+			spot.PrimaryPhotoURL = &photos[i].URL
+		}
+	}
 	spot.Photos = photos
 
 	// Fetch baits
@@ -279,9 +288,15 @@ func (r *InMemorySpotRepository) Delete(ctx context.Context, id uuid.UUID) error
 func (r *InMemorySpotRepository) AddPhoto(ctx context.Context, photo *domainspot.Photo) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if photo.URL == "" && photo.ObjectKey != "" {
+		photo.URL = fmt.Sprintf("/api/v1/media/fishing-spots/%s", photo.ObjectKey)
+	}
 	r.photos[photo.ID] = photo
 	if s, ok := r.spots[photo.SpotID]; ok {
 		s.Photos = append(s.Photos, *photo)
+		if photo.IsPrimary || s.PrimaryPhotoURL == nil {
+			s.PrimaryPhotoURL = &photo.URL
+		}
 	}
 	return nil
 }

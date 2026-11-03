@@ -36,6 +36,22 @@ type UpdateProfileRequest struct {
 	Location *string `json:"location"`
 }
 
+type UserProfileResponse struct {
+	ID                 uuid.UUID `json:"id"`
+	Name               string    `json:"name"`
+	Username           string    `json:"username"`
+	Email              string    `json:"email"`
+	AvatarKey          *string   `json:"avatar_key,omitempty"`
+	AvatarURL          *string   `json:"avatar_url,omitempty"`
+	Bio                *string   `json:"bio,omitempty"`
+	Location           *string   `json:"location,omitempty"`
+	SpotsCount         int64     `json:"spots_count"`
+	EventsCreatedCount int64     `json:"events_created_count"`
+	EventsJoinedCount  int64     `json:"events_joined_count"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+}
+
 func (h *UserHandler) GetByUsername(c *gin.Context) {
 	username := c.Param("username")
 	if username == "" {
@@ -43,13 +59,36 @@ func (h *UserHandler) GetByUsername(c *gin.Context) {
 		return
 	}
 
-	u, err := h.authService.GetUserByUsername(c.Request.Context(), username)
+	view, err := h.authService.GetUserProfileByUsername(c.Request.Context(), username)
 	if err != nil {
 		dto.Error(c, http.StatusNotFound, "User not found")
 		return
 	}
 
-	dto.Success(c, http.StatusOK, "User profile retrieved", u)
+	u := view.User
+	var avatarURL *string
+	if u.AvatarKey != nil && *u.AvatarKey != "" {
+		url := fmt.Sprintf("/api/v1/media/avatars/%s", *u.AvatarKey)
+		avatarURL = &url
+	}
+
+	res := UserProfileResponse{
+		ID:                 u.ID,
+		Name:               u.Name,
+		Username:           u.Username,
+		Email:              u.Email,
+		AvatarKey:          u.AvatarKey,
+		AvatarURL:          avatarURL,
+		Bio:                u.Bio,
+		Location:           u.Location,
+		SpotsCount:         view.Stats.SpotsCount,
+		EventsCreatedCount: view.Stats.EventsCreatedCount,
+		EventsJoinedCount:  view.Stats.EventsJoinedCount,
+		CreatedAt:          u.CreatedAt,
+		UpdatedAt:          u.UpdatedAt,
+	}
+
+	dto.Success(c, http.StatusOK, "User profile retrieved", res)
 }
 
 func (h *UserHandler) UpdateProfile(c *gin.Context) {

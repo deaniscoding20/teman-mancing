@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Compass, Plus, Search, MapPin, MessageSquare, Fish } from "lucide-react";
-import { fetchApi } from "@/lib/api-client";
+import { fetchApi, resolveMediaUrl } from "@/lib/api-client";
 import { getStoredUser } from "@/lib/auth";
 import { FishingSpotItem } from "@/types/api";
 
@@ -110,7 +110,7 @@ export default function SpotsPage() {
               <div className="h-48 bg-brand-background relative flex items-center justify-center overflow-hidden">
                 {spot.primary_photo_url ? (
                   <img
-                    src={spot.primary_photo_url}
+                    src={resolveMediaUrl(spot.primary_photo_url)}
                     alt={spot.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                   />

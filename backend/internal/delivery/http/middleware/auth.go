@@ -35,6 +35,13 @@ func RequireAuth(tokenService *security.TokenService) gin.HandlerFunc {
 			}
 		}
 
+		// Fallback to query parameter (e.g. for WebSocket handshakes /api/v1/ws?token=...)
+		if tokenStr == "" {
+			if queryToken := strings.TrimSpace(c.Query("token")); queryToken != "" {
+				tokenStr = queryToken
+			}
+		}
+
 		if tokenStr == "" {
 			dto.Error(c, http.StatusUnauthorized, "Sesi tidak ditemukan atau header otorisasi hilang")
 			c.Abort()

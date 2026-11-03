@@ -116,6 +116,7 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 	authService := auth.NewAuthService(userRepo, tokenService)
 	authHandler := handlers.NewAuthHandler(authService)
 	userHandler := handlers.NewUserHandler(authService, deps.MinIO)
+	mediaHandler := handlers.NewMediaHandler(deps.MinIO)
 
 	spotService := appspot.NewService(spotRepo)
 	spotHandler := handlers.NewSpotHandler(spotService, deps.MinIO)
@@ -137,6 +138,9 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 		v1.HEAD("/health", healthHandler.Status)
 		v1.GET("/version", versionHandler.Info)
 		v1.HEAD("/version", versionHandler.Info)
+
+		// Public Media / Storage Proxy
+		v1.GET("/media/:bucket/*objectKey", mediaHandler.ServeMedia)
 
 		// Auth Routes (README Section 13)
 		authGroup := v1.Group("/auth")
