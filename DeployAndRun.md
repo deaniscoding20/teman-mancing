@@ -76,12 +76,13 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
-> **Catatan untuk Frontend Production:**
-> Pada `frontend/.env`, jika Anda mengakses dari IP publik VPS atau domain:
+> **Catatan untuk Frontend Production & Domain:**
+> Pada `frontend/.env` dan `infrastructure/docker/.env`, jika menggunakan domain `temanmancing.my.id` dengan SSL (HTTPS):
 > ```env
-> NEXT_PUBLIC_API_URL=http://<IP_VPS_ANDA>:8080/api/v1
-> NEXT_PUBLIC_WS_URL=ws://<IP_VPS_ANDA>:8080/ws
+> NEXT_PUBLIC_API_URL=https://temanmancing.my.id/api/v1
+> NEXT_PUBLIC_WS_URL=wss://temanmancing.my.id/ws
 > ```
+> Nginx diatur untuk me-reverse-proxy port 80/443 SSL langsung ke Next.js (port 3003) dan Go Backend (port 8080) secara zero-downtime.
 
 ### Langkah 3: Build & Jalankan Container
 Jalankan seluruh service dalam background mode:

@@ -97,7 +97,7 @@ services:
       MINIO_BUCKET_AVATARS: ${MINIO_BUCKET_AVATARS:-avatars}
       MINIO_BUCKET_SPOTS: ${MINIO_BUCKET_SPOTS:-fishing-spots}
       MINIO_BUCKET_EVENTS: ${MINIO_BUCKET_EVENTS:-event-covers}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3003,http://127.0.0.1:3003,http://localhost:3080,http://127.0.0.1:3080,http://localhost:3000,http://127.0.0.1:3000}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://temanmancing.my.id,https://www.temanmancing.my.id,http://temanmancing.my.id,http://localhost:3003,http://127.0.0.1:3003,http://43.173.39.59:3003,http://localhost:3080,http://127.0.0.1:3080,http://localhost:3000,http://127.0.0.1:3000}
     depends_on:
       postgres:
         condition: service_healthy

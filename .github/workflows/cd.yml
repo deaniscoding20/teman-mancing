@@ -147,8 +147,9 @@ jobs:
             MSG+="👤 *Deployer:* ${{ github.actor }}%0A"
             MSG+="📝 *Commit:* ${{ github.event.head_commit.message || github.sha }}%0A%0A"
             MSG+="✅ *Status:* Seluruh tahapan pengujian & deploy sukses!%0A"
-            MSG+="🌐 *Web Frontend:* http://43.173.39.59:3003%0A"
-            MSG+="🔌 *Backend API:* http://43.173.39.59:8080/api/v1%0A"
+            MSG+="🌐 *Web Frontend (HTTPS):* https://temanmancing.my.id%0A"
+            MSG+="📱 *Port Fallback:* http://43.173.39.59:3003%0A"
+            MSG+="🔌 *Backend API:* https://temanmancing.my.id/api/v1%0A"
             MSG+="💾 *MinIO Console:* http://43.173.39.59:9001"
           else
             MSG="❌ *[DEPLOY GAGAL] Teman Mancing VPS*%0A%0A"
