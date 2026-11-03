@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	appchat "teman-mancing/backend/internal/application/chat"
+	domainchat "teman-mancing/backend/internal/domain/chat"
 )
 
 type Client struct {
@@ -151,19 +152,40 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request, userID uuid.UUID,
 				continue
 			}
 
-			// Broadcast to sender and conversation room members
-			outBytes, _ := json.Marshal(OutgoingWSMessage{
-				Type:           "new_message",
-				ConversationID: saved.ConversationID,
-				MessageID:      saved.ID,
-				SenderID:       saved.SenderID,
-				SenderName:     saved.SenderName,
-				Content:        saved.Message,
-				CreatedAt:      saved.CreatedAt.Format(time.RFC3339),
-			})
+			// Broadcast to all connected clients
+			h.BroadcastMessage(saved)
+		}
+	}
+}
 
-			// Echo to client
-			client.SendChan <- outBytes
+// BroadcastMessage sends a chat message to all connected clients.
+func (h *Hub) BroadcastMessage(msg *domainchat.Message) {
+	if h == nil || msg == nil {
+		return
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	outBytes, err := json.Marshal(OutgoingWSMessage{
+		Type:           "new_message",
+		ConversationID: msg.ConversationID,
+		MessageID:      msg.ID,
+		SenderID:       msg.SenderID,
+		SenderName:     msg.SenderName,
+		Content:        msg.Message,
+		CreatedAt:      msg.CreatedAt.Format(time.RFC3339),
+	})
+	if err != nil {
+		return
+	}
+
+	for _, clientList := range h.clients {
+		for _, client := range clientList {
+			select {
+			case client.SendChan <- outBytes:
+			default:
+			}
 		}
 	}
 }

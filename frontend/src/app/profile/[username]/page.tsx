@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { User, MapPin, Compass, Calendar, Edit3, Check, X } from "lucide-react";
+import Link from "next/link";
+import { User, MapPin, Compass, Calendar, Edit3, Check, X, MessageSquare } from "lucide-react";
 import { fetchApi } from "@/lib/api-client";
 import { getStoredUser, getToken } from "@/lib/auth";
 import { UserProfile } from "@/types/api";
@@ -114,7 +115,7 @@ export default function ProfilePage() {
                     <h1 className="text-2xl font-bold text-brand-primary">{profile.name}</h1>
                     <p className="text-sm text-brand-secondary font-medium">@{profile.username}</p>
                   </div>
-                  {isOwner && (
+                  {isOwner ? (
                     <button
                       onClick={() => setIsEditing(true)}
                       className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-brand-border bg-brand-background text-brand-primary text-xs font-semibold hover:border-brand-secondary transition"
@@ -122,6 +123,14 @@ export default function ProfilePage() {
                       <Edit3 className="w-3.5 h-3.5 text-brand-secondary" />
                       Edit Profil
                     </button>
+                  ) : (
+                    <Link
+                      href={`/chat?userId=${profile.id}`}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand-secondary text-white text-xs font-semibold hover:bg-brand-secondary/90 transition shadow-sm"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      Kirim Pesan
+                    </Link>
                   )}
                 </div>
 

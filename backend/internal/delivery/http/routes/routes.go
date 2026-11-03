@@ -147,6 +147,7 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 		{
 			authGroup.POST("/register", authHandler.Register)
 			authGroup.POST("/login", authHandler.Login)
+			authGroup.POST("/google", authHandler.GoogleLogin)
 			authGroup.POST("/logout", authHandler.Logout)
 			authGroup.GET("/me", middleware.RequireAuth(tokenService), authHandler.GetMe)
 		}
@@ -217,6 +218,9 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 			notifGroup.POST("/read-all", middleware.RequireAuth(tokenService), notifHandler.MarkAllAsRead)
 		}
 	}
+
+	// Also support root /ws for WebSocket clients pointing to host:port/ws
+	r.GET("/ws", middleware.RequireAuth(tokenService), chatHandler.WebSocket)
 
 	return r
 }

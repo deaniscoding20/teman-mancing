@@ -136,6 +136,10 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
+	if h.hub != nil {
+		h.hub.BroadcastMessage(msg)
+	}
+
 	dto.Success(c, http.StatusCreated, "Message sent successfully", msg)
 }
 

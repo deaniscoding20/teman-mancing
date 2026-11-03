@@ -279,16 +279,25 @@ export default function EventDetailPage() {
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
             {isCreator ? (
-              <span className="text-xs font-bold text-brand-secondary px-4 py-2 rounded-xl bg-brand-background border border-brand-border">
-                Anda adalah Pembuat Event ini
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-brand-secondary px-3 py-1.5 rounded-xl bg-brand-background border border-brand-border">
+                  Pembuat Event
+                </span>
+                <Link
+                  href={`/chat?eventId=${event.id}`}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-brand-primary hover:bg-brand-primary/90 flex items-center gap-1.5 shadow-sm"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-brand-secondary" />
+                  Grup Chat
+                </Link>
+              </div>
             ) : myParticipation?.status === "approved" ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" /> Terdaftar
                 </span>
                 <Link
-                  href="/chat"
+                  href={`/chat?eventId=${event.id}`}
                   className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-brand-primary hover:bg-brand-primary/90 flex items-center gap-1.5 shadow-sm"
                 >
                   <MessageSquare className="w-3.5 h-3.5 text-brand-secondary" />

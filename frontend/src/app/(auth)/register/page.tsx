@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { fetchApi } from "@/lib/api-client";
 import { setAuth } from "@/lib/auth";
+import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -289,6 +290,22 @@ export default function RegisterPage() {
             )}
           </button>
         </form>
+
+        {/* Divider */}
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-brand-border" />
+          </div>
+          <div className="relative flex justify-center text-xs">
+            <span className="px-3 bg-brand-surface text-brand-muted font-medium">atau daftar dengan</span>
+          </div>
+        </div>
+
+        {/* Google Sign In */}
+        <GoogleSignInButton
+          label="Daftar dengan Google"
+          onError={(err) => setError(err)}
+        />
 
         {/* Footer */}
         <div className="mt-8 pt-6 border-t border-brand-border/80 text-center text-xs text-brand-muted">
