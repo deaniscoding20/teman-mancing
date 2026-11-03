@@ -198,28 +198,6 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (*AuthResult,
 		return nil, ErrInvalidAuth
 	}
 
-	// Check if email has been verified
-	if !u.IsVerified {
-		otpCode := generateOTP()
-		verifyToken := uuid.New().String()
-		ver := &domainuser.EmailVerification{
-			ID:        uuid.New(),
-			UserID:    u.ID,
-			OTPCode:   otpCode,
-			Token:     verifyToken,
-			ExpiresAt: time.Now().UTC().Add(15 * time.Minute),
-			CreatedAt: time.Now().UTC(),
-		}
-		_ = s.userRepo.CreateEmailVerification(ctx, ver)
-
-		if s.mailer != nil {
-			go func() {
-				_ = s.mailer.SendVerificationEmail(u.Email, u.Name, otpCode, verifyToken)
-			}()
-		}
-		return nil, ErrEmailNotVerified
-	}
-
 	token, err := s.tokenService.GenerateToken(u.ID, u.Username)
 	if err != nil {
 		return nil, err

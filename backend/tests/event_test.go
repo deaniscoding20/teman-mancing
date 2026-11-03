@@ -53,6 +53,8 @@ func setupEventTestRouter() (http.Handler, string, string, string) {
 		Email:    "host@example.com",
 		Password: "password123",
 	})
+	u1.User.IsVerified = true
+	_ = userRepo.Update(nil, u1.User)
 
 	u2, _ := authService.Register(nil, auth.RegisterInput{
 		Name:     "Participant 1",
@@ -60,6 +62,8 @@ func setupEventTestRouter() (http.Handler, string, string, string) {
 		Email:    "part1@example.com",
 		Password: "password123",
 	})
+	u2.User.IsVerified = true
+	_ = userRepo.Update(nil, u2.User)
 
 	u3, _ := authService.Register(nil, auth.RegisterInput{
 		Name:     "Participant 2",
@@ -67,6 +71,8 @@ func setupEventTestRouter() (http.Handler, string, string, string) {
 		Email:    "part2@example.com",
 		Password: "password123",
 	})
+	u3.User.IsVerified = true
+	_ = userRepo.Update(nil, u3.User)
 
 	return router, u1.Token, u2.Token, u3.Token
 }

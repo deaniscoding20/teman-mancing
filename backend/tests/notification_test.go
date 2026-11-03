@@ -57,6 +57,8 @@ func setupNotificationTestRouter() (http.Handler, string, uuid.UUID, appnotif.Re
 		Email:    "notif@example.com",
 		Password: "password123",
 	})
+	u.User.IsVerified = true
+	_ = userRepo.Update(nil, u.User)
 
 	return router, u.Token, u.User.ID, notifRepo
 }

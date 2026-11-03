@@ -52,6 +52,8 @@ func setupSpotTestRouter() (http.Handler, string, string) {
 		Email:    "a@example.com",
 		Password: "password123",
 	})
+	u1.User.IsVerified = true
+	_ = userRepo.Update(nil, u1.User)
 
 	// User 2
 	u2, _ := authService.Register(nil, auth.RegisterInput{
@@ -60,6 +62,8 @@ func setupSpotTestRouter() (http.Handler, string, string) {
 		Email:    "b@example.com",
 		Password: "password123",
 	})
+	u2.User.IsVerified = true
+	_ = userRepo.Update(nil, u2.User)
 
 	return router, u1.Token, u2.Token
 }
