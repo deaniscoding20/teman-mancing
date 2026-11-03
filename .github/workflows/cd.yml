@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   # ==========================================================
-  # 1. Verification Stage (Ensure tests pass before deploying)
+  # 1. Verification Stage (Ensure tests & E2E pass before deploying)
   # ==========================================================
   verify:
     name: Verify Tests & Compilation
@@ -49,6 +49,16 @@ jobs:
           NEXT_TELEMETRY_DISABLED: 1
           NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
           NEXT_PUBLIC_WS_URL: ws://localhost:8080/ws
+
+      - name: Install Playwright Browsers
+        run: |
+          cd frontend
+          npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E UI Tests
+        run: |
+          cd frontend
+          CI_RUN_SERVER=true npm run test:e2e
 
   # ==========================================================
   # 2. Deployment Stage (Auto-Deploy to VPS on Merge to Main)
@@ -108,3 +118,47 @@ jobs:
             ./infrastructure/scripts/deploy.sh
             
             echo "✅ [CI/CD] Auto-Deployment successfully completed!"
+
+  # ==========================================================
+  # 3. Notification Stage (Telegram Alerts on Success & Error)
+  # ==========================================================
+  notify-telegram:
+    name: Notify Status to Telegram
+    needs: [verify, deploy-vps]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Telegram Notification
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          DEPLOY_RESULT: ${{ needs.deploy-vps.result }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Telegram secrets are not set, skipping notification."
+            exit 0
+          fi
+
+          if [ "$VERIFY_RESULT" = "success" ] && [ "$DEPLOY_RESULT" = "success" ]; then
+            MSG="🎉 *[DEPLOY SELESAI] Teman Mancing VPS*%0A%0A"
+            MSG+="📦 *Repo:* \`${{ github.repository }}\`%0A"
+            MSG+="🌿 *Branch:* \`main\`%0A"
+            MSG+="👤 *Deployer:* ${{ github.actor }}%0A"
+            MSG+="📝 *Commit:* ${{ github.event.head_commit.message || github.sha }}%0A%0A"
+            MSG+="✅ *Status:* Seluruh tahapan pengujian & deploy sukses!%0A"
+            MSG+="🌐 *Web Frontend:* http://43.173.39.59:3003%0A"
+            MSG+="🔌 *Backend API:* http://43.173.39.59:8080/api/v1%0A"
+            MSG+="💾 *MinIO Console:* http://43.173.39.59:9001"
+          else
+            MSG="❌ *[DEPLOY GAGAL] Teman Mancing VPS*%0A%0A"
+            MSG+="📦 *Repo:* \`${{ github.repository }}\`%0A"
+            MSG+="🌿 *Branch:* \`main\`%0A"
+            MSG+="👤 *Actor:* ${{ github.actor }}%0A"
+            MSG+="⚠️ *Verify / E2E:* \`${VERIFY_RESULT}\`%0A"
+            MSG+="⚠️ *VPS Deploy:* \`${DEPLOY_RESULT}\`%0A%0A"
+            MSG+="🔗 *Periksa Log:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
+
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}&text=${MSG}&parse_mode=Markdown" > /dev/null || true
