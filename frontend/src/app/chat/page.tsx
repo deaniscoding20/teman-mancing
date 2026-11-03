@@ -88,6 +88,43 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Real-time WebSocket connection
+  useEffect(() => {
+    if (!token) return;
+
+    const baseWsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080/api/v1/ws";
+    const wsUrl = `${baseWsUrl}?token=${encodeURIComponent(token)}`;
+
+    let ws: WebSocket | null = null;
+    try {
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload && (payload.type === "new_message" || payload.type === "chat_message") && payload.data) {
+            const incoming: MessageItem = payload.data;
+            if (activeConv && incoming.conversation_id === activeConv.id) {
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === incoming.id)) return prev;
+                return [...prev, incoming];
+              });
+            }
+          }
+        } catch (e) {
+          // ignore non-json messages
+        }
+      };
+    } catch (err) {
+      console.warn("WebSocket connection not available:", err);
+    }
+
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, [token, activeConv]);
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !activeConv || !inputText.trim() || sending) return;

@@ -15,6 +15,7 @@ type FishingSpot struct {
 	Address          string             `json:"address"`
 	Latitude         float64            `json:"latitude"`
 	Longitude        float64            `json:"longitude"`
+	PrimaryPhotoURL  *string            `json:"primary_photo_url,omitempty" gorm:"-"`
 	Photos           []Photo            `json:"photos,omitempty" gorm:"-"`
 	FishTypes        []FishType         `json:"fish_types,omitempty" gorm:"-"`
 	Techniques       []FishingTechnique `json:"techniques,omitempty" gorm:"-"`

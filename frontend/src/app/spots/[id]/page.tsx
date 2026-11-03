@@ -15,7 +15,7 @@ import {
   ExternalLink,
   Send,
 } from "lucide-react";
-import { fetchApi } from "@/lib/api-client";
+import { fetchApi, resolveMediaUrl } from "@/lib/api-client";
 import { getStoredUser, getToken } from "@/lib/auth";
 
 interface SpotDetail {
@@ -29,7 +29,8 @@ interface SpotDetail {
   fish_types?: { id: string; name: string }[];
   techniques?: { id: string; name: string }[];
   recommended_baits?: { id: string; name: string; description?: string }[];
-  photos?: { id: string; object_key: string; is_primary: boolean }[];
+  photos?: { id: string; object_key: string; url?: string; is_primary: boolean }[];
+  primary_photo_url?: string;
   created_at: string;
 }
 
@@ -52,6 +53,7 @@ export default function SpotDetailPage() {
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [activePhotoIdx, setActivePhotoIdx] = useState(0);
 
   const currentUser = getStoredUser();
   const token = getToken();
@@ -171,6 +173,40 @@ export default function SpotDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Spot Photo Gallery */}
+      {spot.photos && spot.photos.length > 0 && (
+        <div className="bg-brand-surface rounded-3xl border border-brand-border p-4 sm:p-6 shadow-sm mb-6">
+          <div className="h-72 sm:h-96 w-full rounded-2xl overflow-hidden bg-brand-background relative mb-3">
+            <img
+              src={resolveMediaUrl(spot.photos[activePhotoIdx]?.url || spot.photos[activePhotoIdx]?.object_key)}
+              alt={`${spot.name} photo`}
+              className="w-full h-full object-cover"
+            />
+          </div>
+          {spot.photos.length > 1 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {spot.photos.map((photo, idx) => (
+                <button
+                  key={photo.id || idx}
+                  onClick={() => setActivePhotoIdx(idx)}
+                  className={`w-20 h-16 rounded-xl overflow-hidden shrink-0 border-2 transition ${
+                    activePhotoIdx === idx
+                      ? "border-brand-secondary ring-2 ring-brand-secondary/20"
+                      : "border-brand-border opacity-70 hover:opacity-100"
+                  }`}
+                >
+                  <img
+                    src={resolveMediaUrl(photo.url || photo.object_key)}
+                    alt={`Thumbnail ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Main Info Card */}
       <div className="bg-brand-surface rounded-3xl border border-brand-border p-6 sm:p-10 shadow-sm mb-8">

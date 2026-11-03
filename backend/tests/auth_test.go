@@ -12,7 +12,6 @@ import (
 
 	"teman-mancing/backend/internal/application/auth"
 	"teman-mancing/backend/internal/config"
-	"teman-mancing/backend/internal/delivery/http/dto"
 	"teman-mancing/backend/internal/delivery/http/routes"
 	"teman-mancing/backend/internal/infrastructure/database"
 	"teman-mancing/backend/internal/infrastructure/security"
@@ -188,9 +187,17 @@ func TestAuthFlow(t *testing.T) {
 		t.Fatalf("expected 200 OK for public profile, got %d", wPub.Code)
 	}
 
-	var pubRes dto.Response
+	var pubRes struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Username           string `json:"username"`
+			SpotsCount         int64  `json:"spots_count"`
+			EventsCreatedCount int64  `json:"events_created_count"`
+			EventsJoinedCount  int64  `json:"events_joined_count"`
+		} `json:"data"`
+	}
 	_ = json.Unmarshal(wPub.Body.Bytes(), &pubRes)
-	if !pubRes.Success {
-		t.Errorf("expected success true on public profile")
+	if !pubRes.Success || pubRes.Data.Username != "budimancing" {
+		t.Errorf("expected success true and username budimancing, got %+v", pubRes)
 	}
 }

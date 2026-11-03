@@ -169,4 +169,19 @@ func TestChatMembershipAuthorizationAndPersistence(t *testing.T) {
 	if !listRes.Success {
 		t.Errorf("expected success true in list conversations")
 	}
+
+	// 7. Test WebSocket Query Token Auth
+	reqWSNoAuth, _ := http.NewRequest(http.MethodGet, "/api/v1/ws", nil)
+	wWSNoAuth := httptest.NewRecorder()
+	router.ServeHTTP(wWSNoAuth, reqWSNoAuth)
+	if wWSNoAuth.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for WebSocket without token, got %d", wWSNoAuth.Code)
+	}
+
+	reqWSQuery, _ := http.NewRequest(http.MethodGet, "/api/v1/ws?token="+tokenAlice, nil)
+	wWSQuery := httptest.NewRecorder()
+	router.ServeHTTP(wWSQuery, reqWSQuery)
+	if wWSQuery.Code == http.StatusUnauthorized {
+		t.Errorf("expected WebSocket with query token to pass authentication, but got 401")
+	}
 }
