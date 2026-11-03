@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Compass, Calendar, Users, MapPin, ArrowRight, ShieldCheck, Waves } from "lucide-react";
+import HomeCTAButton from "@/components/home/HomeCTAButton";
 
 export default function HomePage() {
   return (
@@ -106,12 +107,7 @@ export default function HomePage() {
               Daftar gratis sekarang dan bergabunglah dengan ribuan pemancing dari seluruh penjuru Indonesia.
             </p>
           </div>
-          <Link
-            href="/register"
-            className="px-8 py-4 rounded-xl font-bold text-brand-primary bg-white hover:bg-white/95 shadow-md transition shrink-0"
-          >
-            Gabung Sekarang
-          </Link>
+          <HomeCTAButton />
         </div>
       </section>
     </div>
