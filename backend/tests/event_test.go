@@ -45,7 +45,7 @@ func setupEventTestRouter() (http.Handler, string, string, string) {
 		Version:      "1.0.0-test",
 	})
 
-	authService := auth.NewAuthService(userRepo, tokenService)
+	authService := auth.NewAuthService(userRepo, tokenService, nil)
 
 	u1, _ := authService.Register(nil, auth.RegisterInput{
 		Name:     "Host Event",

@@ -10,14 +10,18 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/google/uuid"
+
 	"teman-mancing/backend/internal/application/auth"
+	appuser "teman-mancing/backend/internal/application/user"
 	"teman-mancing/backend/internal/config"
 	"teman-mancing/backend/internal/delivery/http/routes"
+	domainuser "teman-mancing/backend/internal/domain/user"
 	"teman-mancing/backend/internal/infrastructure/database"
 	"teman-mancing/backend/internal/infrastructure/security"
 )
 
-func setupAuthRouter() http.Handler {
+func setupAuthRouter() (http.Handler, appuser.Repository) {
 	cfg := &config.Config{
 		AppEnv:         "test",
 		AppPort:        8080,
@@ -29,19 +33,21 @@ func setupAuthRouter() http.Handler {
 	userRepo := database.NewInMemoryUserRepository()
 	tokenService := security.NewTokenService(cfg.JWTSecret, cfg.JWTExpiration)
 
-	return routes.SetupRouter(routes.RouterDeps{
+	handler := routes.SetupRouter(routes.RouterDeps{
 		Config:       cfg,
 		Logger:       logger,
 		DB:           nil,
 		MinIO:        nil,
+		Mailer:       nil,
 		TokenService: tokenService,
 		UserRepo:     userRepo,
 		Version:      "1.0.0-test",
 	})
+	return handler, userRepo
 }
 
 func TestAuthFlow(t *testing.T) {
-	router := setupAuthRouter()
+	router, userRepo := setupAuthRouter()
 
 	// 1. Register User
 	regPayload := auth.RegisterInput{
@@ -83,7 +89,7 @@ func TestAuthFlow(t *testing.T) {
 		t.Errorf("expected status 409 Conflict for duplicate registration, got %d", wDup.Code)
 	}
 
-	// 3. Login
+	// 3. Login before email verification -> 403 Forbidden
 	loginPayload := auth.LoginInput{
 		Email:    "budi@example.com",
 		Password: "password123",
@@ -94,12 +100,26 @@ func TestAuthFlow(t *testing.T) {
 	wLog := httptest.NewRecorder()
 	router.ServeHTTP(wLog, reqLog)
 
-	if wLog.Code != http.StatusOK {
-		t.Fatalf("expected status 200 OK on login, got %d", wLog.Code)
+	if wLog.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403 Forbidden before email verification, got %d", wLog.Code)
 	}
 
-	// 3b. Verify Cookie was set on login
-	cookies := wLog.Result().Cookies()
+	// 3a. Verify Email
+	u, _ := userRepo.GetByEmail(nil, "budi@example.com")
+	u.IsVerified = true
+	_ = userRepo.Update(nil, u)
+
+	// 3b. Login after email verification -> 200 OK
+	reqLog2, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewBuffer(lBody))
+	reqLog2.Header.Set("Content-Type", "application/json")
+	wLog2 := httptest.NewRecorder()
+	router.ServeHTTP(wLog2, reqLog2)
+	if wLog2.Code != http.StatusOK {
+		t.Fatalf("expected status 200 OK on login after verification, got %d: %s", wLog2.Code, wLog2.Body.String())
+	}
+
+	// 3c. Verify Cookie was set on login
+	cookies := wLog2.Result().Cookies()
 	var authCookieFound bool
 	for _, cookie := range cookies {
 		if cookie.Name == "teman_mancing_token" && cookie.Value != "" && cookie.HttpOnly {
@@ -228,5 +248,42 @@ func TestAuthFlow(t *testing.T) {
 	_ = json.Unmarshal(wGoogle.Body.Bytes(), &gRes)
 	if !gRes.Success || gRes.Data.User.Email != "angler.google@gmail.com" || gRes.Data.Token == "" {
 		t.Errorf("expected successful google login response with token, got %+v", gRes)
+	}
+
+	// 9. Forgot Password endpoint
+	fpPayload := map[string]string{
+		"email": "budi@example.com",
+	}
+	fpBody, _ := json.Marshal(fpPayload)
+	reqFP, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/forgot-password", bytes.NewBuffer(fpBody))
+	reqFP.Header.Set("Content-Type", "application/json")
+	wFP := httptest.NewRecorder()
+	router.ServeHTTP(wFP, reqFP)
+	if wFP.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for forgot-password, got %d", wFP.Code)
+	}
+
+	// 10. Reset Password with token
+	resetToken := "test-reset-token-123"
+	_ = userRepo.CreatePasswordReset(nil, &domainuser.PasswordReset{
+		ID:        uuid.New(),
+		UserID:    u.ID,
+		Email:     "budi@example.com",
+		OTPCode:   "123456",
+		Token:     resetToken,
+		ExpiresAt: time.Now().Add(10 * time.Minute),
+	})
+
+	rpPayload := map[string]string{
+		"token":    resetToken,
+		"password": "newpassword123",
+	}
+	rpBody, _ := json.Marshal(rpPayload)
+	reqRP, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/reset-password", bytes.NewBuffer(rpBody))
+	reqRP.Header.Set("Content-Type", "application/json")
+	wRP := httptest.NewRecorder()
+	router.ServeHTTP(wRP, reqRP)
+	if wRP.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for reset-password, got %d: %s", wRP.Code, wRP.Body.String())
 	}
 }

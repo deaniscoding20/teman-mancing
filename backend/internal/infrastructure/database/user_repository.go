@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -88,4 +89,77 @@ func (r *GormUserRepository) GetProfileView(ctx context.Context, id uuid.UUID) (
 			EventsJoinedCount:  eventsJoinedCount,
 		},
 	}, nil
+}
+
+func (r *GormUserRepository) CreateEmailVerification(ctx context.Context, v *domainuser.EmailVerification) error {
+	return r.db.WithContext(ctx).Table("email_verifications").Create(v).Error
+}
+
+func (r *GormUserRepository) GetEmailVerificationByToken(ctx context.Context, token string) (*domainuser.EmailVerification, error) {
+	var v domainuser.EmailVerification
+	err := r.db.WithContext(ctx).Table("email_verifications").Where("token = ? AND expires_at > ?", token, time.Now().UTC()).First(&v).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+func (r *GormUserRepository) GetEmailVerificationByOTP(ctx context.Context, userID uuid.UUID, otp string) (*domainuser.EmailVerification, error) {
+	var v domainuser.EmailVerification
+	err := r.db.WithContext(ctx).Table("email_verifications").
+		Where("user_id = ? AND otp_code = ? AND expires_at > ?", userID, otp, time.Now().UTC()).
+		Order("created_at DESC").
+		First(&v).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+func (r *GormUserRepository) DeleteEmailVerification(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Table("email_verifications").Where("id = ?", id).Delete(nil).Error
+}
+
+func (r *GormUserRepository) CreatePasswordReset(ctx context.Context, reset *domainuser.PasswordReset) error {
+	return r.db.WithContext(ctx).Table("password_resets").Create(reset).Error
+}
+
+func (r *GormUserRepository) GetPasswordResetByToken(ctx context.Context, token string) (*domainuser.PasswordReset, error) {
+	var reset domainuser.PasswordReset
+	err := r.db.WithContext(ctx).Table("password_resets").
+		Where("token = ? AND used_at IS NULL AND expires_at > ?", token, time.Now().UTC()).
+		First(&reset).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &reset, nil
+}
+
+func (r *GormUserRepository) GetPasswordResetByOTP(ctx context.Context, email, otp string) (*domainuser.PasswordReset, error) {
+	var reset domainuser.PasswordReset
+	err := r.db.WithContext(ctx).Table("password_resets").
+		Where("email = ? AND otp_code = ? AND used_at IS NULL AND expires_at > ?", strings.ToLower(email), otp, time.Now().UTC()).
+		Order("created_at DESC").
+		First(&reset).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &reset, nil
+}
+
+func (r *GormUserRepository) MarkPasswordResetUsed(ctx context.Context, id uuid.UUID) error {
+	now := time.Now().UTC()
+	return r.db.WithContext(ctx).Table("password_resets").Where("id = ?", id).Update("used_at", now).Error
 }

@@ -75,11 +75,10 @@ export default function RegisterPage() {
         }),
       });
 
-      if (res.data?.token && res.data?.user) {
-        setAuth(res.data.token, res.data.user);
+      if (res.data?.user) {
         setSuccess(true);
         setTimeout(() => {
-          router.push("/");
+          router.push(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`);
         }, 1200);
       }
     } catch (err: any) {
@@ -109,7 +108,7 @@ export default function RegisterPage() {
         {success && (
           <div className="mb-6 p-4 rounded-2xl bg-green-50 border border-green-200 flex items-center gap-3 text-green-800 text-sm">
             <CheckCircle2 className="w-5 h-5 shrink-0 text-green-600" />
-            <span className="font-semibold">Pendaftaran berhasil! Mengalihkan ke beranda...</span>
+            <span className="font-semibold">Pendaftaran berhasil! Mengalihkan ke halaman verifikasi email...</span>
           </div>
         )}
 

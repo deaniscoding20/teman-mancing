@@ -27,6 +27,18 @@ type Config struct {
 	MinIOBuckets   MinIOBuckets
 	AllowedOrigins []string
 	RedisURL       string
+	SMTPHost       string
+	SMTPPort       int
+	SMTPUser       string
+	SMTPPassword   string
+	SMTPUseSSL     bool
+	SMTPSender     string
+	SMTPSenderName string
+	AppBaseURL     string
+
+	GoogleClientID     string
+	GoogleClientSecret string
+	GoogleRedirectURL  string
 }
 
 // MinIOBuckets specifies bucket names.
@@ -61,6 +73,17 @@ func Load() *Config {
 		},
 		AllowedOrigins: getEnvAsSlice("ALLOWED_ORIGINS", []string{"http://localhost:3080", "http://127.0.0.1:3080", "http://localhost:3000", "http://127.0.0.1:3000"}),
 		RedisURL:       getEnv("REDIS_URL", "redis://localhost:6379"),
+		SMTPHost:       getEnv("SMTP_HOST", "smtp.sumopod.com"),
+		SMTPPort:       getEnvAsInt("SMTP_PORT", 465),
+		SMTPUser:       getEnv("SMTP_USER", "cmw0i63e310in08odzvjptyy7"),
+		SMTPPassword:   getEnv("SMTP_PASSWORD", ""),
+		SMTPUseSSL:     getEnvAsBool("SMTP_USE_SSL", true),
+		SMTPSender:     getEnv("SMTP_SENDER", "noreply@sumopod.com"),
+		SMTPSenderName: getEnv("SMTP_SENDER_NAME", "Teman Mancing"),
+		AppBaseURL:     getEnv("APP_BASE_URL", "https://temanmancing.my.id"),
+		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
+		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
+		GoogleRedirectURL:  getEnv("GOOGLE_REDIRECT_URL", "https://temanmancing.my.id/api/v1/auth/google/callback"),
 	}
 }
 
