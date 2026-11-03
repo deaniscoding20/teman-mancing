@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Calendar, Plus, ArrowLeft, AlertCircle, Car, Ship } from "lucide-react";
+import LocationMapPicker from "@/components/common/LocationMapPicker";
 import { fetchApi } from "@/lib/api-client";
 import { getToken } from "@/lib/auth";
 
@@ -14,6 +15,8 @@ export default function CreateEventPage() {
   const [description, setDescription] = useState("");
   const [destinationName, setDestinationName] = useState("");
   const [destinationAddress, setDestinationAddress] = useState("");
+  const [destinationLat, setDestinationLat] = useState("-6.2088");
+  const [destinationLng, setDestinationLng] = useState("106.8456");
   const [eventDate, setEventDate] = useState("2026-12-15");
   const [startTime, setStartTime] = useState("06:00:00");
   const [endTime, setEndTime] = useState("12:00:00");
@@ -180,19 +183,23 @@ export default function CreateEventPage() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-brand-text uppercase tracking-wider mb-2">
-              Alamat Lengkap Destinasi *
-            </label>
-            <input
-              type="text"
-              required
-              value={destinationAddress}
-              onChange={(e) => setDestinationAddress(e.target.value)}
-              placeholder="Jl. Raya Waduk Cirata KM 12, Purwakarta, Jawa Barat"
-              className="w-full px-4 py-2.5 rounded-xl border border-brand-border bg-brand-background text-brand-text text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary"
-            />
-          </div>
+          {/* Lokasi Peta & Alamat Destinasi via Google Maps / OSM */}
+          <LocationMapPicker
+            label="Cari Lokasi Destinasi di Peta / Google Maps"
+            address={destinationAddress}
+            latitude={destinationLat}
+            longitude={destinationLng}
+            onAddressChange={(newAddr) => {
+              setDestinationAddress(newAddr);
+              if (!destinationName) {
+                setDestinationName(newAddr.split(",")[0] || newAddr);
+              }
+            }}
+            onCoordinateChange={(lat, lng) => {
+              setDestinationLat(lat);
+              setDestinationLng(lng);
+            }}
+          />
 
           {/* Tanggal & Waktu */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
