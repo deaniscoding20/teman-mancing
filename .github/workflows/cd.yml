@@ -1,0 +1,106 @@
+name: CD Auto-Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+jobs:
+  # ==========================================================
+  # 1. Verification Stage (Ensure tests pass before deploying)
+  # ==========================================================
+  verify:
+    name: Verify Tests & Compilation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go 1.23
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: backend/go.sum
+
+      - name: Run Backend Tests
+        run: |
+          cd backend
+          go test -v ./tests/...
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Verify Frontend Build
+        run: |
+          cd frontend
+          npm ci
+          npx tsc --noEmit
+          npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
+          NEXT_PUBLIC_WS_URL: ws://localhost:8080/ws
+
+  # ==========================================================
+  # 2. Deployment Stage (Auto-Deploy to VPS on Merge to Main)
+  # ==========================================================
+  deploy-vps:
+    name: Deploy to Production VPS
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check Deployment Secrets
+        id: check_secrets
+        run: |
+          if [ -n "${{ secrets.VPS_HOST }}" ] && [ -n "${{ secrets.VPS_SSH_KEY }}" ]; then
+            echo "configured=true" >> $GITHUB_OUTPUT
+            echo "VPS Deployment Secrets are present."
+          else
+            echo "configured=false" >> $GITHUB_OUTPUT
+            echo "::warning::VPS_HOST and/or VPS_SSH_KEY secrets are not configured in GitHub Repository Settings. Skipping SSH deployment step."
+          fi
+
+      - name: Deploy via SSH to VPS
+        if: steps.check_secrets.outputs.configured == 'true'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME || 'root' }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script_stop: true
+          script: |
+            echo "🚀 [CI/CD] Starting Auto-Deployment on VPS..."
+            
+            DEPLOY_PATH="${{ secrets.VPS_DEPLOY_PATH || '/opt/teman-mancing' }}"
+            if [ ! -d "$DEPLOY_PATH" ]; then
+              DEPLOY_PATH="$HOME/teman-mancing"
+            fi
+            
+            if [ ! -d "$DEPLOY_PATH" ]; then
+              echo "Creating deployment directory at $DEPLOY_PATH..."
+              git clone https://github.com/${{ github.repository }}.git "$DEPLOY_PATH"
+            fi
+            
+            cd "$DEPLOY_PATH"
+            
+            echo "📥 Pulling latest commits from origin/main..."
+            git fetch origin main
+            git reset --hard origin/main
+            
+            echo "⚙️ Executing deployment script..."
+            chmod +x infrastructure/scripts/deploy.sh
+            ./infrastructure/scripts/deploy.sh
+            
+            echo "✅ [CI/CD] Auto-Deployment successfully completed!"

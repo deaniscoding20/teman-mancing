@@ -262,7 +262,35 @@ sudo certbot --nginx -d temanmancing.id -d www.temanmancing.id
 
 ---
 
-## 9. Menjalankan Unit Testing di VPS
+## 10. CI/CD Pipeline & GitHub Actions (Auto-Deploy)
+
+Repository ini telah dilengkapi dengan pipeline otomatis menggunakan GitHub Actions:
+
+### Alur Kerja (Workflow)
+1. **Pull Request Validation (CI)**:
+   * Setiap Pull Request yang diajukan ke branch `main` akan secara otomatis menjalankan:
+     * Pengujian Unit & Integrasi Backend Golang (`go test -v -race ./tests/...`)
+     * Pengecekan Typecheck TypeScript (`npx tsc --noEmit`)
+     * Verifikasi Build Next.js (`npm run build`)
+     * Validasi sintaks `docker-compose.yml`
+   * **Aturan PR**: Setiap kali membuat Pull Request baru, wajib menyertakan file `changesinfo.md` di root proyek agar agent lain / reviewer dapat memahami perubahan dan menyetujui merge.
+2. **Auto-Deploy to VPS (CD)**:
+   * Ketika Pull Request di-merge ke branch `main`, GitHub Actions akan otomatis melakukan deploy ke VPS melalui SSH dan mengeksekusi skrip `infrastructure/scripts/deploy.sh`.
+
+### Setup GitHub Repository Secrets
+Untuk mengaktifkan auto-deploy ke VPS, tambahkan secrets berikut di repository GitHub Anda (**Settings ➔ Secrets and variables ➔ Actions ➔ New repository secret**):
+
+| Secret Name | Deskripsi | Contoh |
+|---|---|---|
+| `VPS_HOST` | IP Publik atau Hostname VPS Anda | `123.45.67.89` |
+| `VPS_USERNAME` | User SSH pada VPS | `root` atau `ubuntu` |
+| `VPS_SSH_KEY` | Private SSH Key (ed25519 / RSA) untuk akses ke VPS | `-----BEGIN OPENSSH PRIVATE KEY----- ...` |
+| `VPS_PORT` | Port SSH VPS (Opsional, default 22) | `22` |
+| `VPS_DEPLOY_PATH` | Lokasi folder project di VPS (Opsional) | `/opt/teman-mancing` |
+
+---
+
+## 11. Menjalankan Unit Testing di VPS
 Untuk memverifikasi integritas kode backend pada server VPS:
 ```bash
 cd backend
