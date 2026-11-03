@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Compass, Plus, Search, MapPin, MessageSquare, Fish } from "lucide-react";
+import { Compass, Plus, Search, MapPin, MessageSquare, Fish, Map as MapIcon, Grid, ExternalLink } from "lucide-react";
 import { fetchApi, resolveMediaUrl } from "@/lib/api-client";
 import { getStoredUser } from "@/lib/auth";
 import { FishingSpotItem } from "@/types/api";
@@ -11,6 +11,8 @@ export default function SpotsPage() {
   const [spots, setSpots] = useState<FishingSpotItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "map">("grid");
+  const [selectedSpot, setSelectedSpot] = useState<FishingSpotItem | null>(null);
   const currentUser = getStoredUser();
 
   const loadSpots = (q: string = "") => {
@@ -64,19 +66,53 @@ export default function SpotsPage() {
         )}
       </div>
 
-      {/* Search Bar */}
-      <form onSubmit={handleSearch} className="mb-8">
-        <div className="relative max-w-xl">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari spot berdasarkan nama, alamat, atau deskripsi..."
-            className="w-full pl-11 pr-4 py-3 rounded-2xl border border-brand-border bg-brand-surface text-brand-text placeholder-brand-muted/70 text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary shadow-sm transition"
-          />
-          <Search className="w-5 h-5 text-brand-muted absolute left-4 top-1/2 -translate-y-1/2" />
+      {/* Search Bar & View Toggle */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-8">
+        <form onSubmit={handleSearch} className="flex-1 max-w-xl">
+          <div className="relative">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari spot berdasarkan nama, alamat, atau kota..."
+              className="w-full pl-11 pr-4 py-3 rounded-2xl border border-brand-border bg-brand-surface text-brand-text placeholder-brand-muted/70 text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary shadow-sm transition"
+            />
+            <Search className="w-5 h-5 text-brand-muted absolute left-4 top-1/2 -translate-y-1/2" />
+          </div>
+        </form>
+
+        <div className="flex items-center gap-1.5 p-1 rounded-2xl border border-brand-border bg-brand-surface self-start sm:self-auto shrink-0">
+          <button
+            type="button"
+            onClick={() => setViewMode("grid")}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
+              viewMode === "grid"
+                ? "bg-brand-primary text-white shadow-xs"
+                : "text-brand-muted hover:text-brand-primary"
+            }`}
+          >
+            <Grid className="w-4 h-4" />
+            <span>Kartu</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode("map");
+              if (!selectedSpot && spots.length > 0) {
+                setSelectedSpot(spots[0]);
+              }
+            }}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
+              viewMode === "map"
+                ? "bg-brand-primary text-white shadow-xs"
+                : "text-brand-muted hover:text-brand-primary"
+            }`}
+          >
+            <MapIcon className="w-4 h-4" />
+            <span>Peta Lokasi</span>
+          </button>
         </div>
-      </form>
+      </div>
 
       {/* Spots Grid */}
       {loading ? (
@@ -97,6 +133,84 @@ export default function SpotsPage() {
             <Plus className="w-4 h-4 text-brand-secondary" />
             Bagikan Spot Pertama
           </Link>
+        </div>
+      ) : viewMode === "map" ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Map Frame */}
+          <div className="lg:col-span-2 bg-brand-surface rounded-3xl border border-brand-border overflow-hidden shadow-sm flex flex-col h-[520px]">
+            <div className="p-4 bg-brand-surface border-b border-brand-border flex items-center justify-between text-xs">
+              <span className="font-bold text-brand-primary flex items-center gap-1.5">
+                <MapPin className="w-4 h-4 text-brand-secondary" />
+                {selectedSpot ? selectedSpot.name : "Pilih spot di samping untuk melihat lokasi"}
+              </span>
+              {selectedSpot && (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${selectedSpot.latitude},${selectedSpot.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-semibold text-brand-secondary hover:underline"
+                >
+                  <span>Buka di Google Maps</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+            </div>
+            <div className="flex-1 w-full bg-brand-background">
+              {selectedSpot ? (
+                <iframe
+                  title="Peta Spot Mancing"
+                  width="100%"
+                  height="100%"
+                  frameBorder="0"
+                  scrolling="no"
+                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${selectedSpot.longitude - 0.02}%2C${selectedSpot.latitude - 0.02}%2C${selectedSpot.longitude + 0.02}%2C${selectedSpot.latitude + 0.02}&layer=mapnik&marker=${selectedSpot.latitude}%2C${selectedSpot.longitude}`}
+                  className="w-full h-full border-0"
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-xs text-brand-muted">
+                  Klik salah satu spot untuk menampilkan titik koordinat di peta
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Spot Selection List */}
+          <div className="space-y-3 h-[520px] overflow-y-auto pr-1">
+            {spots.map((spot) => {
+              const isSelected = selectedSpot?.id === spot.id;
+              return (
+                <div
+                  key={spot.id}
+                  onClick={() => setSelectedSpot(spot)}
+                  className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col gap-1.5 ${
+                    isSelected
+                      ? "bg-brand-surface border-brand-secondary shadow-sm ring-2 ring-brand-secondary/20"
+                      : "bg-brand-surface border-brand-border hover:border-brand-secondary/40"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="font-bold text-sm text-brand-primary line-clamp-1">{spot.name}</h4>
+                    <span className="text-[10px] text-brand-secondary font-mono">
+                      {spot.latitude?.toFixed(4)}, {spot.longitude?.toFixed(4)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-brand-muted line-clamp-1 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-brand-secondary shrink-0" />
+                    <span>{spot.address}</span>
+                  </p>
+                  <div className="pt-2 mt-1 border-t border-brand-border flex items-center justify-between text-xs">
+                    <span className="text-brand-muted text-[11px]">{spot.comments_count || 0} Ulasan</span>
+                    <Link
+                      href={`/spots/${spot.id}`}
+                      className="text-brand-secondary font-semibold hover:underline"
+                    >
+                      Detail Spot &rarr;
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

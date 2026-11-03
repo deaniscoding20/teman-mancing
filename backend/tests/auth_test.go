@@ -200,4 +200,33 @@ func TestAuthFlow(t *testing.T) {
 	if !pubRes.Success || pubRes.Data.Username != "budimancing" {
 		t.Errorf("expected success true and username budimancing, got %+v", pubRes)
 	}
+
+	// 8. Google OAuth Login endpoint
+	googlePayload := map[string]string{
+		"email": "angler.google@gmail.com",
+		"name":  "Angler Google User",
+	}
+	gBody, _ := json.Marshal(googlePayload)
+	reqGoogle, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/google", bytes.NewBuffer(gBody))
+	reqGoogle.Header.Set("Content-Type", "application/json")
+	wGoogle := httptest.NewRecorder()
+	router.ServeHTTP(wGoogle, reqGoogle)
+
+	if wGoogle.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for Google login, got %d: %s", wGoogle.Code, wGoogle.Body.String())
+	}
+
+	var gRes struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Token string `json:"token"`
+			User  struct {
+				Email string `json:"email"`
+			} `json:"user"`
+		} `json:"data"`
+	}
+	_ = json.Unmarshal(wGoogle.Body.Bytes(), &gRes)
+	if !gRes.Success || gRes.Data.User.Email != "angler.google@gmail.com" || gRes.Data.Token == "" {
+		t.Errorf("expected successful google login response with token, got %+v", gRes)
+	}
 }

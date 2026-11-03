@@ -17,6 +17,7 @@ import {
   MessageSquare,
   LogOut,
   Settings,
+  ExternalLink,
 } from "lucide-react";
 import { fetchApi } from "@/lib/api-client";
 import { getStoredUser, getToken } from "@/lib/auth";
@@ -224,11 +225,38 @@ export default function EventDetailPage() {
           </p>
         </div>
 
-        {/* Meeting point */}
+        {/* Meeting point & Google Maps Navigation */}
         <div className="mt-8 p-5 rounded-2xl bg-brand-background border border-brand-border">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-brand-primary mb-2 flex items-center gap-1.5">
-            <MapPin className="w-4 h-4 text-brand-secondary" /> Titik Kumpul (Meeting Point)
-          </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-brand-primary flex items-center gap-1.5">
+              <MapPin className="w-4 h-4 text-brand-secondary" /> Titik Kumpul (Meeting Point) & Lokasi
+            </h3>
+            <div className="flex items-center gap-2">
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                  event.meeting_point + " " + event.destination_address
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-brand-secondary hover:underline"
+              >
+                <span>Google Maps</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+              <span className="text-brand-border">|</span>
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+                  event.meeting_point + " " + event.destination_address
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-brand-secondary hover:underline"
+              >
+                <span>Rute Petunjuk Arah</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
           <p className="text-sm font-semibold text-brand-text">{event.meeting_point}</p>
           <p className="text-xs text-brand-muted mt-1">{event.destination_address}</p>
         </div>
@@ -279,16 +307,25 @@ export default function EventDetailPage() {
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
             {isCreator ? (
-              <span className="text-xs font-bold text-brand-secondary px-4 py-2 rounded-xl bg-brand-background border border-brand-border">
-                Anda adalah Pembuat Event ini
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-brand-secondary px-3 py-1.5 rounded-xl bg-brand-background border border-brand-border">
+                  Pembuat Event
+                </span>
+                <Link
+                  href={`/chat?eventId=${event.id}`}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-brand-primary hover:bg-brand-primary/90 flex items-center gap-1.5 shadow-sm"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-brand-secondary" />
+                  Grup Chat
+                </Link>
+              </div>
             ) : myParticipation?.status === "approved" ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" /> Terdaftar
                 </span>
                 <Link
-                  href="/chat"
+                  href={`/chat?eventId=${event.id}`}
                   className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-brand-primary hover:bg-brand-primary/90 flex items-center gap-1.5 shadow-sm"
                 >
                   <MessageSquare className="w-3.5 h-3.5 text-brand-secondary" />

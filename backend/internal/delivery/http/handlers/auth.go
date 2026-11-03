@@ -120,6 +120,43 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	dto.Success(c, http.StatusOK, "Logged out successfully", nil)
 }
 
+type GoogleLoginRequest struct {
+	IDToken     string `json:"id_token"`
+	AccessToken string `json:"access_token"`
+	Email       string `json:"email"`
+	Name        string `json:"name"`
+	AvatarURL   string `json:"avatar_url"`
+}
+
+func (h *AuthHandler) GoogleLogin(c *gin.Context) {
+	var req GoogleLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		dto.Error(c, http.StatusBadRequest, "Invalid request payload format", dto.FieldError{
+			Field:   "body",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	result, err := h.authService.GoogleLogin(c.Request.Context(), auth.GoogleLoginInput{
+		IDToken:     req.IDToken,
+		AccessToken: req.AccessToken,
+		Email:       req.Email,
+		Name:        req.Name,
+		AvatarURL:   req.AvatarURL,
+	})
+	if err != nil {
+		dto.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Set HttpOnly session cookie
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("teman_mancing_token", result.Token, 86400*7, "/", "", false, true)
+
+	dto.Success(c, http.StatusOK, "Login Google berhasil", result)
+}
+
 func (h *AuthHandler) GetMe(c *gin.Context) {
 	userID, ok := middleware.GetAuthUserID(c)
 	if !ok {

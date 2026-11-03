@@ -2,8 +2,13 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -33,6 +38,14 @@ type LoginInput struct {
 	Email      string `json:"email"`
 	Username   string `json:"username"`
 	Password   string `json:"password"`
+}
+
+type GoogleLoginInput struct {
+	IDToken     string `json:"id_token"`
+	AccessToken string `json:"access_token"`
+	Email       string `json:"email"`
+	Name        string `json:"name"`
+	AvatarURL   string `json:"avatar_url"`
 }
 
 type AuthResult struct {
@@ -154,6 +167,93 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (*AuthResult,
 
 	return &AuthResult{
 		User:  u,
+		Token: token,
+	}, nil
+}
+
+func (s *AuthService) GoogleLogin(ctx context.Context, input GoogleLoginInput) (*AuthResult, error) {
+	email := strings.TrimSpace(input.Email)
+	name := strings.TrimSpace(input.Name)
+
+	// If IDToken is provided, verify with Google TokenInfo API
+	if strings.TrimSpace(input.IDToken) != "" {
+		reqURL := fmt.Sprintf("https://oauth2.googleapis.com/tokeninfo?id_token=%s", strings.TrimSpace(input.IDToken))
+		client := &http.Client{Timeout: 8 * time.Second}
+		resp, err := client.Get(reqURL)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			defer resp.Body.Close()
+			var tokenInfo struct {
+				Email   string `json:"email"`
+				Name    string `json:"name"`
+				Picture string `json:"picture"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&tokenInfo); err == nil && tokenInfo.Email != "" {
+				email = tokenInfo.Email
+				if tokenInfo.Name != "" {
+					name = tokenInfo.Name
+				}
+			}
+		}
+	}
+
+	cleanEmail := strings.ToLower(strings.TrimSpace(email))
+	if cleanEmail == "" {
+		return nil, errors.New("email Google tidak valid atau tidak dapat diverifikasi")
+	}
+
+	if name == "" {
+		parts := strings.Split(cleanEmail, "@")
+		name = parts[0]
+	}
+
+	// 1. Check if user already exists
+	existingUser, err := s.userRepo.GetByEmail(ctx, cleanEmail)
+	if err == nil && existingUser != nil {
+		token, err := s.tokenService.GenerateToken(existingUser.ID, existingUser.Username)
+		if err != nil {
+			return nil, err
+		}
+		return &AuthResult{
+			User:  existingUser,
+			Token: token,
+		}, nil
+	}
+
+	// 2. Generate unique username from email
+	cleanBase := strings.Split(cleanEmail, "@")[0]
+	reg := regexp.MustCompile("[^a-z0-9_]")
+	cleanBase = reg.ReplaceAllString(strings.ToLower(cleanBase), "")
+	if len(cleanBase) < 3 {
+		cleanBase = "angler"
+	}
+	if len(cleanBase) > 20 {
+		cleanBase = cleanBase[:20]
+	}
+
+	candidateUsername := cleanBase
+	existingByUsername, _ := s.userRepo.GetByUsername(ctx, candidateUsername)
+	if existingByUsername != nil {
+		candidateUsername = fmt.Sprintf("%s%d", cleanBase, time.Now().Unix()%10000)
+	}
+
+	// 3. Create user with secure random password
+	randomPassword := uuid.New().String() + "A1!"
+	newUser, err := domainuser.NewUser(name, candidateUsername, cleanEmail, randomPassword)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.userRepo.Create(ctx, newUser); err != nil {
+		return nil, err
+	}
+
+	token, err := s.tokenService.GenerateToken(newUser.ID, newUser.Username)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AuthResult{
+		User:  newUser,
 		Token: token,
 	}, nil
 }

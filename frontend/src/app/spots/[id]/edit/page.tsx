@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Edit3, ArrowLeft, AlertCircle, Save } from "lucide-react";
+import LocationMapPicker from "@/components/common/LocationMapPicker";
 import { fetchApi } from "@/lib/api-client";
 import { getStoredUser, getToken } from "@/lib/auth";
 
@@ -143,45 +144,16 @@ export default function EditSpotPage() {
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-brand-text uppercase tracking-wider mb-2">
-              Alamat Lengkap *
-            </label>
-            <input
-              type="text"
-              required
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-brand-border bg-brand-background text-brand-text text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-brand-text uppercase tracking-wider mb-2">
-                Latitude *
-              </label>
-              <input
-                type="text"
-                required
-                value={latitude}
-                onChange={(e) => setLatitude(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-brand-border bg-brand-background text-brand-text text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-brand-text uppercase tracking-wider mb-2">
-                Longitude *
-              </label>
-              <input
-                type="text"
-                required
-                value={longitude}
-                onChange={(e) => setLongitude(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-brand-border bg-brand-background text-brand-text text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary"
-              />
-            </div>
-          </div>
+          <LocationMapPicker
+            address={address}
+            latitude={latitude}
+            longitude={longitude}
+            onAddressChange={(newAddr) => setAddress(newAddr)}
+            onCoordinateChange={(lat, lng) => {
+              setLatitude(lat);
+              setLongitude(lng);
+            }}
+          />
 
           <button
             type="submit"
