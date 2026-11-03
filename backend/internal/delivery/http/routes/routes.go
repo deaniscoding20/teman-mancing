@@ -134,7 +134,9 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 	v1 := r.Group("/api/v1")
 	{
 		v1.GET("/health", healthHandler.Status)
+		v1.HEAD("/health", healthHandler.Status)
 		v1.GET("/version", versionHandler.Info)
+		v1.HEAD("/version", versionHandler.Info)
 
 		// Auth Routes (README Section 13)
 		authGroup := v1.Group("/auth")
