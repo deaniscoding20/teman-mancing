@@ -10,6 +10,7 @@ interface LocationMapPickerProps {
   onAddressChange: (address: string) => void;
   onCoordinateChange: (lat: string, lng: string) => void;
   label?: string;
+  showCoordinatesInput?: boolean;
 }
 
 interface GeocodingResult {
@@ -26,6 +27,7 @@ export default function LocationMapPicker({
   onAddressChange,
   onCoordinateChange,
   label = "Lokasi & Koordinat Peta",
+  showCoordinatesInput = false,
 }: LocationMapPickerProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestions, setSuggestions] = useState<GeocodingResult[]>([]);
@@ -207,31 +209,33 @@ export default function LocationMapPicker({
         />
       </div>
 
-      {/* Latitude & Longitude Inputs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-semibold text-brand-muted mb-1">Latitude</label>
-          <input
-            type="text"
-            required
-            value={latitude}
-            onChange={(e) => onCoordinateChange(e.target.value, longitude)}
-            placeholder="-6.2088"
-            className="w-full px-4 py-2 rounded-xl border border-brand-border bg-brand-background text-brand-text text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary"
-          />
+      {/* Latitude & Longitude Inputs (Hidden by default, populated automatically via search/GPS) */}
+      {showCoordinatesInput && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-brand-muted mb-1">Latitude</label>
+            <input
+              type="text"
+              required
+              value={latitude}
+              onChange={(e) => onCoordinateChange(e.target.value, longitude)}
+              placeholder="-6.2088"
+              className="w-full px-4 py-2 rounded-xl border border-brand-border bg-brand-background text-brand-text text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-brand-muted mb-1">Longitude</label>
+            <input
+              type="text"
+              required
+              value={longitude}
+              onChange={(e) => onCoordinateChange(latitude, e.target.value)}
+              placeholder="106.8456"
+              className="w-full px-4 py-2 rounded-xl border border-brand-border bg-brand-background text-brand-text text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary"
+            />
+          </div>
         </div>
-        <div>
-          <label className="block text-xs font-semibold text-brand-muted mb-1">Longitude</label>
-          <input
-            type="text"
-            required
-            value={longitude}
-            onChange={(e) => onCoordinateChange(latitude, e.target.value)}
-            placeholder="106.8456"
-            className="w-full px-4 py-2 rounded-xl border border-brand-border bg-brand-background text-brand-text text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary"
-          />
-        </div>
-      </div>
+      )}
 
       {/* Interactive Map Preview with Google Maps Actions */}
       <div className="rounded-2xl border border-brand-border overflow-hidden bg-brand-background">

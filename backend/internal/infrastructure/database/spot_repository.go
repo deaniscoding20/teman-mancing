@@ -34,6 +34,10 @@ func (r *GormSpotRepository) List(ctx context.Context, filter appspot.ListSpotsF
 		q = q.Where("LOWER(name) LIKE ? OR LOWER(address) LIKE ? OR LOWER(description) LIKE ?", term, term, term)
 	}
 
+	if filter.UserID != nil {
+		q = q.Where("user_id = ?", *filter.UserID)
+	}
+
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
@@ -88,6 +92,19 @@ func (r *GormSpotRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain
 	var count int64
 	_ = r.db.WithContext(ctx).Table("spot_comments").Where("spot_id = ?", id).Count(&count)
 	spot.CommentsCount = count
+
+	// Fetch author details (Issue #19)
+	var author domainspot.AuthorInfo
+	if err := r.db.WithContext(ctx).Table("users").
+		Select("id, name, username, avatar_key").
+		Where("id = ?", spot.UserID).
+		Scan(&author).Error; err == nil && author.ID != uuid.Nil {
+		if author.AvatarKey != nil && *author.AvatarKey != "" {
+			avatarURL := fmt.Sprintf("/api/v1/media/avatars/%s", *author.AvatarKey)
+			author.AvatarURL = &avatarURL
+		}
+		spot.Author = &author
+	}
 
 	return &spot, nil
 }
@@ -237,6 +254,9 @@ func (r *InMemorySpotRepository) List(ctx context.Context, filter appspot.ListSp
 			if !strings.Contains(strings.ToLower(s.Name), q) && !strings.Contains(strings.ToLower(s.Address), q) {
 				continue
 			}
+		}
+		if filter.UserID != nil && s.UserID != *filter.UserID {
+			continue
 		}
 		result = append(result, s)
 	}

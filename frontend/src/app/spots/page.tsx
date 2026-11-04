@@ -190,8 +190,8 @@ export default function SpotsPage() {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <h4 className="font-bold text-sm text-brand-primary line-clamp-1">{spot.name}</h4>
-                    <span className="text-[10px] text-brand-secondary font-mono">
-                      {spot.latitude?.toFixed(4)}, {spot.longitude?.toFixed(4)}
+                    <span className="text-[10px] text-brand-secondary font-medium bg-brand-secondary/10 px-2 py-0.5 rounded-full">
+                      Spot Mancing
                     </span>
                   </div>
                   <p className="text-xs text-brand-muted line-clamp-1 flex items-center gap-1">

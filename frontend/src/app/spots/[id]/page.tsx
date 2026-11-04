@@ -18,9 +18,18 @@ import {
 import { fetchApi, resolveMediaUrl } from "@/lib/api-client";
 import { getStoredUser, getToken } from "@/lib/auth";
 
+interface SpotAuthor {
+  id: string;
+  name: string;
+  username: string;
+  avatar_key?: string;
+  avatar_url?: string;
+}
+
 interface SpotDetail {
   id: string;
   user_id: string;
+  author?: SpotAuthor;
   name: string;
   description: string;
   address: string;
@@ -67,7 +76,30 @@ export default function SpotDetailPage() {
       fetchApi<SpotComment[]>(`/spots/${spotId}/comments`),
     ])
       .then(([spotRes, commentsRes]) => {
-        if (spotRes.data) setSpot(spotRes.data);
+        if (spotRes.data) {
+          const spotData = spotRes.data;
+          setSpot(spotData);
+
+          // Track recently viewed spots for authenticated user (Issue #21)
+          if (currentUser?.id) {
+            try {
+              const storageKey = `recent_spots_${currentUser.id}`;
+              const existingRaw = localStorage.getItem(storageKey);
+              let existing: any[] = existingRaw ? JSON.parse(existingRaw) : [];
+              existing = existing.filter((s: any) => s.id !== spotData.id);
+              existing.unshift({
+                id: spotData.id,
+                name: spotData.name,
+                address: spotData.address,
+                primary_photo_url: spotData.primary_photo_url || spotData.photos?.[0]?.url,
+                viewed_at: new Date().toISOString(),
+              });
+              localStorage.setItem(storageKey, JSON.stringify(existing.slice(0, 8)));
+            } catch (e) {
+              // ignore storage errors
+            }
+          }
+        }
         if (commentsRes.data) setComments(commentsRes.data);
       })
       .catch((err) => {
@@ -219,6 +251,37 @@ export default function SpotDetailPage() {
             <MapPin className="w-4 h-4 text-brand-secondary shrink-0" />
             <span>{spot.address}</span>
           </p>
+
+          {/* Author attribution (Issue #19) */}
+          <div className="flex items-center gap-3 pt-1">
+            <Link
+              href={spot.author?.username ? `/profile/${spot.author.username}` : "#"}
+              className="group flex items-center gap-2.5 px-3 py-2 rounded-2xl bg-brand-background hover:bg-brand-border/40 border border-brand-border transition"
+            >
+              <div className="w-8 h-8 rounded-full bg-brand-secondary/15 flex items-center justify-center text-brand-secondary font-bold text-xs shrink-0 overflow-hidden border border-brand-secondary/30">
+                {spot.author?.avatar_url || spot.author?.avatar_key ? (
+                  <img
+                    src={resolveMediaUrl(spot.author.avatar_url || spot.author.avatar_key)}
+                    alt={spot.author.name || "Author"}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span>{(spot.author?.name || "A").charAt(0).toUpperCase()}</span>
+                )}
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="text-[11px] text-brand-muted leading-tight">Dibagikan oleh</span>
+                <span className="text-xs font-bold text-brand-primary group-hover:text-brand-secondary transition leading-tight">
+                  {spot.author?.name || "Angler Teman Mancing"}
+                  {spot.author?.username && (
+                    <span className="font-normal text-brand-muted ml-1">
+                      (@{spot.author.username})
+                    </span>
+                  )}
+                </span>
+              </div>
+            </Link>
+          </div>
 
           <p className="mt-4 text-base text-brand-text leading-relaxed whitespace-pre-line">
             {spot.description}

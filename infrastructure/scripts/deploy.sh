@@ -62,6 +62,9 @@ docker exec -i teman_mancing_postgres psql -U teman_mancing_user -d teman_mancin
 
 docker exec -i teman_mancing_postgres psql -U teman_mancing_user -d teman_mancing \
   < "${ROOT_DIR}/backend/migrations/000003_add_auth_verification_and_reset.up.sql" || true
+
+docker exec -i teman_mancing_postgres psql -U teman_mancing_user -d teman_mancing \
+  < "${ROOT_DIR}/backend/migrations/000004_add_event_meeting_location.up.sql" || true
 echo "✅ Migrasi database selesai diaplikasikan."
 
 # 5. Uji Healthcheck Backend dan Frontend

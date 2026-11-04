@@ -12,6 +12,7 @@ type ListSpotsFilter struct {
 	Page      int
 	Limit     int
 	Query     string
+	UserID    *uuid.UUID
 	FishType  string
 	Technique string
 	Sort      string

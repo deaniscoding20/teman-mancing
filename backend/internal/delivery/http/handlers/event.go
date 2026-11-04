@@ -35,6 +35,11 @@ type CreateEventRequest struct {
 	StartTime            string     `json:"start_time" binding:"required"` // HH:MM:SS
 	EndTime              *string    `json:"end_time"`
 	MeetingPoint         string     `json:"meeting_point" binding:"required"`
+	MeetingAddress       *string    `json:"meeting_address"`
+	MeetingLatitude      *float64   `json:"meeting_latitude"`
+	MeetingLongitude     *float64   `json:"meeting_longitude"`
+	SameMeetingLocation  bool       `json:"same_meeting_location"`
+	LocationNotes        *string    `json:"location_notes"`
 	Difficulty           string     `json:"difficulty"`
 	HasParkingFee        bool       `json:"has_parking_fee"`
 	ParkingFee           *float64   `json:"parking_fee"`
@@ -53,8 +58,13 @@ type UpdateEventRequest struct {
 	DestinationAddress *string  `json:"destination_address"`
 	Latitude           *float64 `json:"latitude"`
 	Longitude          *float64 `json:"longitude"`
-	MeetingPoint       *string  `json:"meeting_point"`
-	Difficulty         *string  `json:"difficulty"`
+	MeetingPoint        *string  `json:"meeting_point"`
+	MeetingAddress      *string  `json:"meeting_address"`
+	MeetingLatitude     *float64 `json:"meeting_latitude"`
+	MeetingLongitude    *float64 `json:"meeting_longitude"`
+	SameMeetingLocation *bool    `json:"same_meeting_location"`
+	LocationNotes       *string  `json:"location_notes"`
+	Difficulty          *string  `json:"difficulty"`
 	HasParkingFee      *bool    `json:"has_parking_fee"`
 	ParkingFee         *float64 `json:"parking_fee"`
 	RequiresBoat       *bool    `json:"requires_boat"`
@@ -74,14 +84,30 @@ func (h *EventHandler) List(c *gin.Context) {
 	visibility := c.Query("visibility")
 	status := c.Query("status")
 
+	var filterCreatorID *uuid.UUID
+	if cidStr := c.Query("creator_id"); cidStr != "" {
+		if cid, err := uuid.Parse(cidStr); err == nil {
+			filterCreatorID = &cid
+		}
+	}
+
+	var filterParticipantID *uuid.UUID
+	if pidStr := c.Query("participant_id"); pidStr != "" {
+		if pid, err := uuid.Parse(pidStr); err == nil {
+			filterParticipantID = &pid
+		}
+	}
+
 	events, total, err := h.eventService.ListEvents(c.Request.Context(), appevent.ListEventsFilter{
-		Page:       page,
-		Limit:      limit,
-		Query:      query,
-		Date:       date,
-		Difficulty: difficulty,
-		Visibility: visibility,
-		Status:     status,
+		Page:          page,
+		Limit:         limit,
+		Query:         query,
+		CreatorID:     filterCreatorID,
+		ParticipantID: filterParticipantID,
+		Date:          date,
+		Difficulty:    difficulty,
+		Visibility:    visibility,
+		Status:        status,
 	})
 	if err != nil {
 		dto.Error(c, http.StatusInternalServerError, "Failed to retrieve events")
@@ -150,6 +176,11 @@ func (h *EventHandler) Create(c *gin.Context) {
 		StartTime:            req.StartTime,
 		EndTime:              req.EndTime,
 		MeetingPoint:         req.MeetingPoint,
+		MeetingAddress:       req.MeetingAddress,
+		MeetingLatitude:      req.MeetingLatitude,
+		MeetingLongitude:     req.MeetingLongitude,
+		SameMeetingLocation:  req.SameMeetingLocation,
+		LocationNotes:        req.LocationNotes,
 		Difficulty:           req.Difficulty,
 		HasParkingFee:        req.HasParkingFee,
 		ParkingFee:           req.ParkingFee,
@@ -195,8 +226,13 @@ func (h *EventHandler) Update(c *gin.Context) {
 		DestinationAddress: req.DestinationAddress,
 		Latitude:           req.Latitude,
 		Longitude:          req.Longitude,
-		MeetingPoint:       req.MeetingPoint,
-		Difficulty:         req.Difficulty,
+		MeetingPoint:        req.MeetingPoint,
+		MeetingAddress:      req.MeetingAddress,
+		MeetingLatitude:     req.MeetingLatitude,
+		MeetingLongitude:    req.MeetingLongitude,
+		SameMeetingLocation: req.SameMeetingLocation,
+		LocationNotes:       req.LocationNotes,
+		Difficulty:          req.Difficulty,
 		HasParkingFee:      req.HasParkingFee,
 		ParkingFee:         req.ParkingFee,
 		RequiresBoat:       req.RequiresBoat,

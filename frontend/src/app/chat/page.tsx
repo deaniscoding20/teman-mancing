@@ -81,7 +81,24 @@ function ChatContent() {
         }
 
         if (paramEventId) {
-          const found = list.find((c) => c.event_id === paramEventId);
+          let found = list.find((c) => c.event_id === paramEventId);
+          if (!found) {
+            try {
+              const createGroupRes = await fetchApi<ConversationItem>("/conversations", {
+                method: "POST",
+                body: JSON.stringify({ type: "group", event_id: paramEventId }),
+              });
+              if (createGroupRes.data) {
+                found = createGroupRes.data;
+                if (!list.some((c) => c.id === found!.id)) {
+                  list = [found, ...list];
+                  setConversations(list);
+                }
+              }
+            } catch (err: any) {
+              console.warn("Could not auto-open group conversation:", err);
+            }
+          }
           if (found) {
             setActiveConv(found);
             return;

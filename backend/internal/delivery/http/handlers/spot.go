@@ -67,10 +67,18 @@ func (h *SpotHandler) List(c *gin.Context) {
 	technique := c.Query("technique")
 	sort := c.Query("sort")
 
+	var filterUserID *uuid.UUID
+	if uidStr := c.Query("user_id"); uidStr != "" {
+		if uid, err := uuid.Parse(uidStr); err == nil {
+			filterUserID = &uid
+		}
+	}
+
 	spots, total, err := h.spotService.ListSpots(c.Request.Context(), appspot.ListSpotsFilter{
 		Page:      page,
 		Limit:     limit,
 		Query:     query,
+		UserID:    filterUserID,
 		FishType:  fishType,
 		Technique: technique,
 		Sort:      sort,

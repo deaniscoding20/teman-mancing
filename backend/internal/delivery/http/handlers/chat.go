@@ -9,26 +9,31 @@ import (
 	"github.com/google/uuid"
 
 	appchat "teman-mancing/backend/internal/application/chat"
+	appevent "teman-mancing/backend/internal/application/event"
 	"teman-mancing/backend/internal/delivery/http/dto"
 	"teman-mancing/backend/internal/delivery/http/middleware"
+	domainevent "teman-mancing/backend/internal/domain/event"
 	infraWS "teman-mancing/backend/internal/infrastructure/websocket"
 )
 
 type ChatHandler struct {
 	chatService *appchat.Service
+	eventRepo   appevent.Repository
 	hub         *infraWS.Hub
 }
 
-func NewChatHandler(chatService *appchat.Service, hub *infraWS.Hub) *ChatHandler {
+func NewChatHandler(chatService *appchat.Service, eventRepo appevent.Repository, hub *infraWS.Hub) *ChatHandler {
 	return &ChatHandler{
 		chatService: chatService,
+		eventRepo:   eventRepo,
 		hub:         hub,
 	}
 }
 
 type CreateConversationRequest struct {
-	Type          string    `json:"type" binding:"required"` // direct
-	ParticipantID uuid.UUID `json:"participant_id" binding:"required"`
+	Type          string     `json:"type" binding:"required"` // direct or group
+	ParticipantID *uuid.UUID `json:"participant_id"`
+	EventID       *uuid.UUID `json:"event_id"`
 }
 
 type SendMessageRequest struct {
@@ -66,7 +71,38 @@ func (h *ChatHandler) CreateConversation(c *gin.Context) {
 		return
 	}
 
-	conv, err := h.chatService.GetOrCreateDirectConversation(c.Request.Context(), userID, req.ParticipantID)
+	if req.Type == "group" {
+		if req.EventID == nil {
+			dto.Error(c, http.StatusBadRequest, "event_id wajib disertakan untuk percakapan grup")
+			return
+		}
+		if h.eventRepo != nil {
+			ev, err := h.eventRepo.GetByID(c.Request.Context(), *req.EventID)
+			if err != nil || ev == nil {
+				dto.Error(c, http.StatusNotFound, "Event tidak ditemukan")
+				return
+			}
+			p, err := h.eventRepo.GetParticipant(c.Request.Context(), *req.EventID, userID)
+			if err != nil || p == nil || p.Status != domainevent.ParticipantStatusApproved {
+				dto.Error(c, http.StatusForbidden, "Hanya peserta yang telah disetujui yang dapat mengakses grup chat event")
+				return
+			}
+			conv, err := h.chatService.GetOrCreateEventGroupConversation(c.Request.Context(), *req.EventID, ev.Name, ev.CreatorID, userID)
+			if err != nil {
+				dto.Error(c, http.StatusInternalServerError, "Gagal membuka grup chat event")
+				return
+			}
+			dto.Success(c, http.StatusOK, "Grup chat event siap", conv)
+			return
+		}
+	}
+
+	if req.ParticipantID == nil {
+		dto.Error(c, http.StatusBadRequest, "participant_id wajib disertakan untuk percakapan direct")
+		return
+	}
+
+	conv, err := h.chatService.GetOrCreateDirectConversation(c.Request.Context(), userID, *req.ParticipantID)
 	if err != nil {
 		dto.Error(c, http.StatusBadRequest, err.Error())
 		return
