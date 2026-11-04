@@ -41,6 +41,27 @@ func (s *Service) GetOrCreateDirectConversation(ctx context.Context, currentUser
 	return s.repo.CreateDirectConversation(ctx, currentUserID, targetUserID)
 }
 
+func (s *Service) GetOrCreateEventGroupConversation(ctx context.Context, eventID uuid.UUID, eventName string, creatorID, actorID uuid.UUID) (*domainchat.Conversation, error) {
+	conv, err := s.repo.GetConversationByEventID(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+	if conv == nil {
+		conv, err = s.repo.CreateGroupConversation(ctx, &eventID, &eventName, creatorID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Ensure actor is a participant
+	isMember, _ := s.repo.IsParticipant(ctx, conv.ID, actorID)
+	if !isMember {
+		_ = s.repo.AddParticipant(ctx, conv.ID, actorID)
+	}
+
+	return conv, nil
+}
+
 func (s *Service) GetMessages(ctx context.Context, convID, actorID uuid.UUID, limit, offset int) ([]*domainchat.Message, error) {
 	// 1. Strict membership validation (README Section 12.3)
 	isMember, err := s.repo.IsParticipant(ctx, convID, actorID)

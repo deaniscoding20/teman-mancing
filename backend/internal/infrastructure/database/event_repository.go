@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	appchat "teman-mancing/backend/internal/application/chat"
 	appevent "teman-mancing/backend/internal/application/event"
 	domainevent "teman-mancing/backend/internal/domain/event"
 )
@@ -221,6 +222,11 @@ func (r *GormEventRepository) JoinEventTx(ctx context.Context, eventID, userID u
 }
 
 func (r *GormEventRepository) LeaveEvent(ctx context.Context, eventID, userID uuid.UUID) error {
+	var convID uuid.UUID
+	_ = r.db.WithContext(ctx).Table("conversations").Select("id").Where("event_id = ?", eventID).Scan(&convID)
+	if convID != uuid.Nil {
+		_ = r.db.WithContext(ctx).Table("conversation_participants").Where("conversation_id = ? AND user_id = ?", convID, userID).Delete(nil)
+	}
 	return r.db.WithContext(ctx).Table("event_participants").Where("event_id = ? AND user_id = ?", eventID, userID).Delete(&domainevent.Participant{}).Error
 }
 
@@ -298,13 +304,25 @@ type InMemoryEventRepository struct {
 	mu           sync.Mutex
 	events       map[uuid.UUID]*domainevent.Event
 	participants map[string]*domainevent.Participant // key: eventID_userID
+	chatRepo     appchat.Repository
 }
 
-func NewInMemoryEventRepository() *InMemoryEventRepository {
+func NewInMemoryEventRepository(chatRepos ...appchat.Repository) *InMemoryEventRepository {
+	var cr appchat.Repository
+	if len(chatRepos) > 0 {
+		cr = chatRepos[0]
+	}
 	return &InMemoryEventRepository{
 		events:       make(map[uuid.UUID]*domainevent.Event),
 		participants: make(map[string]*domainevent.Participant),
+		chatRepo:     cr,
 	}
+}
+
+func (r *InMemoryEventRepository) SetChatRepository(cr appchat.Repository) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.chatRepo = cr
 }
 
 func (r *InMemoryEventRepository) List(ctx context.Context, filter appevent.ListEventsFilter) ([]*domainevent.Event, int64, error) {
@@ -366,6 +384,13 @@ func (r *InMemoryEventRepository) Create(ctx context.Context, event *domainevent
 		Status:   domainevent.ParticipantStatusApproved,
 		JoinedAt: time.Now().UTC(),
 	}
+
+	// Issue #13: Create group chat conversation for in-memory event
+	if r.chatRepo != nil {
+		eventName := event.Name
+		_, _ = r.chatRepo.CreateGroupConversation(ctx, &event.ID, &eventName, event.CreatorID)
+	}
+
 	return nil
 }
 
@@ -425,6 +450,14 @@ func (r *InMemoryEventRepository) JoinEventTx(ctx context.Context, eventID, user
 		JoinedAt: time.Now().UTC(),
 	}
 	r.participants[key] = p
+
+	// If approved, synchronize group chat membership (Issue #13 & #27)
+	if status == domainevent.ParticipantStatusApproved && r.chatRepo != nil {
+		if conv, _ := r.chatRepo.GetConversationByEventID(ctx, eventID); conv != nil {
+			_ = r.chatRepo.AddParticipant(ctx, conv.ID, userID)
+		}
+	}
+
 	return p, nil
 }
 
@@ -436,6 +469,11 @@ func (r *InMemoryEventRepository) LeaveEvent(ctx context.Context, eventID, userI
 		if p.Status == domainevent.ParticipantStatusApproved {
 			if ev, ok := r.events[eventID]; ok && ev.ApprovedParticipants > 0 {
 				ev.ApprovedParticipants--
+			}
+			if r.chatRepo != nil {
+				if conv, _ := r.chatRepo.GetConversationByEventID(ctx, eventID); conv != nil {
+					_ = r.chatRepo.RemoveParticipant(ctx, conv.ID, userID)
+				}
 			}
 		}
 		delete(r.participants, key)
@@ -481,6 +519,20 @@ func (r *InMemoryEventRepository) UpdateParticipantStatus(ctx context.Context, e
 	if prevStatus != domainevent.ParticipantStatusApproved && status == domainevent.ParticipantStatusApproved {
 		if ev, ok := r.events[eventID]; ok {
 			ev.ApprovedParticipants++
+		}
+		if r.chatRepo != nil {
+			if conv, _ := r.chatRepo.GetConversationByEventID(ctx, eventID); conv != nil {
+				_ = r.chatRepo.AddParticipant(ctx, conv.ID, userID)
+			}
+		}
+	} else if prevStatus == domainevent.ParticipantStatusApproved && status != domainevent.ParticipantStatusApproved {
+		if ev, ok := r.events[eventID]; ok && ev.ApprovedParticipants > 0 {
+			ev.ApprovedParticipants--
+		}
+		if r.chatRepo != nil {
+			if conv, _ := r.chatRepo.GetConversationByEventID(ctx, eventID); conv != nil {
+				_ = r.chatRepo.RemoveParticipant(ctx, conv.ID, userID)
+			}
 		}
 	}
 	return nil

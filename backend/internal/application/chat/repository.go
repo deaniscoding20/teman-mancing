@@ -10,8 +10,10 @@ import (
 type Repository interface {
 	ListConversations(ctx context.Context, userID uuid.UUID) ([]*domainchat.Conversation, error)
 	GetConversationByID(ctx context.Context, convID uuid.UUID) (*domainchat.Conversation, error)
+	GetConversationByEventID(ctx context.Context, eventID uuid.UUID) (*domainchat.Conversation, error)
 	GetDirectConversation(ctx context.Context, user1, user2 uuid.UUID) (*domainchat.Conversation, error)
 	CreateDirectConversation(ctx context.Context, user1, user2 uuid.UUID) (*domainchat.Conversation, error)
+	CreateGroupConversation(ctx context.Context, eventID *uuid.UUID, name *string, creatorID uuid.UUID) (*domainchat.Conversation, error)
 
 	// Membership check (README Section 12.3: Chat Authorization)
 	IsParticipant(ctx context.Context, convID, userID uuid.UUID) (bool, error)

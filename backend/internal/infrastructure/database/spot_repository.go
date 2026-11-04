@@ -89,6 +89,19 @@ func (r *GormSpotRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain
 	_ = r.db.WithContext(ctx).Table("spot_comments").Where("spot_id = ?", id).Count(&count)
 	spot.CommentsCount = count
 
+	// Fetch author details (Issue #19)
+	var author domainspot.AuthorInfo
+	if err := r.db.WithContext(ctx).Table("users").
+		Select("id, name, username, avatar_key").
+		Where("id = ?", spot.UserID).
+		Scan(&author).Error; err == nil && author.ID != uuid.Nil {
+		if author.AvatarKey != nil && *author.AvatarKey != "" {
+			avatarURL := fmt.Sprintf("/api/v1/media/avatars/%s", *author.AvatarKey)
+			author.AvatarURL = &avatarURL
+		}
+		spot.Author = &author
+	}
+
 	return &spot, nil
 }
 

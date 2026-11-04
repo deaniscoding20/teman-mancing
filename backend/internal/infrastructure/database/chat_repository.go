@@ -81,6 +81,49 @@ func (r *GormChatRepository) GetConversationByID(ctx context.Context, convID uui
 	return &conv, nil
 }
 
+func (r *GormChatRepository) GetConversationByEventID(ctx context.Context, eventID uuid.UUID) (*domainchat.Conversation, error) {
+	var conv domainchat.Conversation
+	err := r.db.WithContext(ctx).Table("conversations").Where("event_id = ?", eventID).First(&conv).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &conv, nil
+}
+
+func (r *GormChatRepository) CreateGroupConversation(ctx context.Context, eventID *uuid.UUID, name *string, creatorID uuid.UUID) (*domainchat.Conversation, error) {
+	convID := uuid.New()
+	now := time.Now().UTC()
+
+	conv := &domainchat.Conversation{
+		ID:        convID,
+		Type:      domainchat.TypeGroup,
+		EventID:   eventID,
+		EventName: name,
+		CreatedAt: now,
+	}
+
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Table("conversations").Create(conv).Error; err != nil {
+			return err
+		}
+		part := map[string]any{
+			"id":              uuid.New(),
+			"conversation_id": convID,
+			"user_id":         creatorID,
+			"joined_at":       now,
+		}
+		return tx.Table("conversation_participants").Create(&part).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return conv, nil
+}
+
 func (r *GormChatRepository) GetDirectConversation(ctx context.Context, user1, user2 uuid.UUID) (*domainchat.Conversation, error) {
 	var convID uuid.UUID
 	query := `
@@ -232,6 +275,34 @@ func (r *InMemoryChatRepository) GetConversationByID(ctx context.Context, convID
 		return nil, nil
 	}
 	return c, nil
+}
+
+func (r *InMemoryChatRepository) GetConversationByEventID(ctx context.Context, eventID uuid.UUID) (*domainchat.Conversation, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, c := range r.convs {
+		if c.EventID != nil && *c.EventID == eventID {
+			return c, nil
+		}
+	}
+	return nil, nil
+}
+
+func (r *InMemoryChatRepository) CreateGroupConversation(ctx context.Context, eventID *uuid.UUID, name *string, creatorID uuid.UUID) (*domainchat.Conversation, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	convID := uuid.New()
+	conv := &domainchat.Conversation{
+		ID:        convID,
+		Type:      domainchat.TypeGroup,
+		EventID:   eventID,
+		EventName: name,
+		CreatedAt: time.Now().UTC(),
+	}
+	r.convs[convID] = conv
+	r.participants[convID] = []uuid.UUID{creatorID}
+	return conv, nil
 }
 
 func (r *InMemoryChatRepository) GetDirectConversation(ctx context.Context, user1, user2 uuid.UUID) (*domainchat.Conversation, error) {

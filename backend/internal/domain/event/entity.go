@@ -70,6 +70,11 @@ type Event struct {
 	StartTime            string        `json:"start_time"` // HH:MM:SS
 	EndTime              *string       `json:"end_time,omitempty"`
 	MeetingPoint         string        `json:"meeting_point"`
+	MeetingAddress       *string       `json:"meeting_address,omitempty"`
+	MeetingLatitude      *float64      `json:"meeting_latitude,omitempty"`
+	MeetingLongitude     *float64      `json:"meeting_longitude,omitempty"`
+	SameMeetingLocation  bool          `json:"same_meeting_location"`
+	LocationNotes        *string       `json:"location_notes,omitempty"`
 	Difficulty           string        `json:"difficulty"`
 	HasParkingFee        bool          `json:"has_parking_fee"`
 	ParkingFee           *float64      `json:"parking_fee,omitempty"`

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Compass, Calendar, MessageSquare, Bell, User, Fish, LogOut, Settings } from "lucide-react";
+import { Compass, Calendar, MessageSquare, Bell, User, Fish, LogOut } from "lucide-react";
 import { getStoredUser, clearAuth } from "@/lib/auth";
 import { fetchApi } from "@/lib/api-client";
 
@@ -110,14 +110,6 @@ export function Navbar() {
                     @{currentUser.username}
                   </span>
                 </div>
-              </Link>
-
-              <Link
-                href="/settings/profile"
-                className="p-2 text-brand-muted hover:text-brand-primary rounded-xl transition"
-                title="Pengaturan Profil"
-              >
-                <Settings className="w-4 h-4" />
               </Link>
 
               <button

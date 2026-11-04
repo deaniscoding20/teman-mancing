@@ -30,6 +30,11 @@ type CreateEventInput struct {
 	StartTime            string     `json:"start_time"` // HH:MM:SS
 	EndTime              *string    `json:"end_time,omitempty"`
 	MeetingPoint         string     `json:"meeting_point"`
+	MeetingAddress       *string    `json:"meeting_address,omitempty"`
+	MeetingLatitude      *float64   `json:"meeting_latitude,omitempty"`
+	MeetingLongitude     *float64   `json:"meeting_longitude,omitempty"`
+	SameMeetingLocation  bool       `json:"same_meeting_location"`
+	LocationNotes        *string    `json:"location_notes,omitempty"`
 	Difficulty           string     `json:"difficulty"`
 	HasParkingFee        bool       `json:"has_parking_fee"`
 	ParkingFee           *float64   `json:"parking_fee,omitempty"`
@@ -49,6 +54,11 @@ type UpdateEventInput struct {
 	Latitude             *float64   `json:"latitude"`
 	Longitude            *float64   `json:"longitude"`
 	MeetingPoint         *string    `json:"meeting_point"`
+	MeetingAddress       *string    `json:"meeting_address"`
+	MeetingLatitude      *float64   `json:"meeting_latitude"`
+	MeetingLongitude     *float64   `json:"meeting_longitude"`
+	SameMeetingLocation  *bool      `json:"same_meeting_location"`
+	LocationNotes        *string    `json:"location_notes"`
 	Difficulty           *string    `json:"difficulty"`
 	HasParkingFee        *bool      `json:"has_parking_fee"`
 	ParkingFee           *float64   `json:"parking_fee"`
@@ -123,6 +133,11 @@ func (s *Service) CreateEvent(ctx context.Context, input CreateEventInput) (*dom
 		StartTime:            input.StartTime,
 		EndTime:              input.EndTime,
 		MeetingPoint:         input.MeetingPoint,
+		MeetingAddress:       input.MeetingAddress,
+		MeetingLatitude:      input.MeetingLatitude,
+		MeetingLongitude:     input.MeetingLongitude,
+		SameMeetingLocation:  input.SameMeetingLocation,
+		LocationNotes:        input.LocationNotes,
 		Difficulty:           input.Difficulty,
 		HasParkingFee:        input.HasParkingFee,
 		ParkingFee:           input.ParkingFee,
@@ -173,6 +188,21 @@ func (s *Service) UpdateEvent(ctx context.Context, eventID, actorID uuid.UUID, i
 	}
 	if input.MeetingPoint != nil {
 		ev.MeetingPoint = *input.MeetingPoint
+	}
+	if input.MeetingAddress != nil {
+		ev.MeetingAddress = input.MeetingAddress
+	}
+	if input.MeetingLatitude != nil {
+		ev.MeetingLatitude = input.MeetingLatitude
+	}
+	if input.MeetingLongitude != nil {
+		ev.MeetingLongitude = input.MeetingLongitude
+	}
+	if input.SameMeetingLocation != nil {
+		ev.SameMeetingLocation = *input.SameMeetingLocation
+	}
+	if input.LocationNotes != nil {
+		ev.LocationNotes = input.LocationNotes
 	}
 	if input.Difficulty != nil {
 		ev.Difficulty = *input.Difficulty

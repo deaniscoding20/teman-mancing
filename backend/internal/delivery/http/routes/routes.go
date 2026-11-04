@@ -83,15 +83,6 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 		}
 	}
 
-	eventRepo := deps.EventRepo
-	if eventRepo == nil {
-		if deps.DB != nil && deps.DB.DB != nil {
-			eventRepo = database.NewGormEventRepository(deps.DB.DB)
-		} else {
-			eventRepo = database.NewInMemoryEventRepository()
-		}
-	}
-
 	chatRepo := deps.ChatRepo
 	if chatRepo == nil {
 		if deps.DB != nil && deps.DB.DB != nil {
@@ -99,6 +90,17 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 		} else {
 			chatRepo = database.NewInMemoryChatRepository()
 		}
+	}
+
+	eventRepo := deps.EventRepo
+	if eventRepo == nil {
+		if deps.DB != nil && deps.DB.DB != nil {
+			eventRepo = database.NewGormEventRepository(deps.DB.DB)
+		} else {
+			eventRepo = database.NewInMemoryEventRepository(chatRepo)
+		}
+	} else if inMemEv, ok := eventRepo.(*database.InMemoryEventRepository); ok {
+		inMemEv.SetChatRepository(chatRepo)
 	}
 
 	notifRepo := deps.NotificationRepo
@@ -133,7 +135,7 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 
 	chatService := appchat.NewService(chatRepo)
 	wsHub := infraWS.NewHub(chatService, deps.Logger)
-	chatHandler := handlers.NewChatHandler(chatService, wsHub)
+	chatHandler := handlers.NewChatHandler(chatService, eventRepo, wsHub)
 
 	notifService := appnotif.NewService(notifRepo)
 	notifHandler := handlers.NewNotificationHandler(notifService)

@@ -6,10 +6,20 @@ import (
 	"github.com/google/uuid"
 )
 
+// AuthorInfo represents the angler who created/shared the fishing spot.
+type AuthorInfo struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	Username  string    `json:"username"`
+	AvatarKey *string   `json:"avatar_key,omitempty"`
+	AvatarURL *string   `json:"avatar_url,omitempty"`
+}
+
 // FishingSpot represents a fishing spot location.
 type FishingSpot struct {
 	ID               uuid.UUID          `json:"id"`
 	UserID           uuid.UUID          `json:"user_id"`
+	Author           *AuthorInfo        `json:"author,omitempty" gorm:"-"`
 	Name             string             `json:"name"`
 	Description      string             `json:"description"`
 	Address          string             `json:"address"`

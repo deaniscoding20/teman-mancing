@@ -21,6 +21,11 @@ export default function CreateEventPage() {
   const [startTime, setStartTime] = useState("06:00:00");
   const [endTime, setEndTime] = useState("12:00:00");
   const [meetingPoint, setMeetingPoint] = useState("");
+  const [meetingAddress, setMeetingAddress] = useState("");
+  const [meetingLat, setMeetingLat] = useState("-6.2088");
+  const [meetingLng, setMeetingLng] = useState("106.8456");
+  const [sameMeetingLocation, setSameMeetingLocation] = useState(false);
+  const [locationNotes, setLocationNotes] = useState("");
   const [difficulty, setDifficulty] = useState("pemula");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [maxParticipants, setMaxParticipants] = useState("10");
@@ -61,10 +66,17 @@ export default function CreateEventPage() {
           description,
           destination_name: destinationName,
           destination_address: destinationAddress,
+          latitude: parseFloat(destinationLat) || -6.2088,
+          longitude: parseFloat(destinationLng) || 106.8456,
           event_date: eventDate,
           start_time: startTime,
           end_time: endTime || undefined,
-          meeting_point: meetingPoint,
+          meeting_point: sameMeetingLocation ? destinationName : meetingPoint,
+          meeting_address: sameMeetingLocation ? destinationAddress : meetingAddress,
+          meeting_latitude: sameMeetingLocation ? (parseFloat(destinationLat) || -6.2088) : (parseFloat(meetingLat) || -6.2088),
+          meeting_longitude: sameMeetingLocation ? (parseFloat(destinationLng) || 106.8456) : (parseFloat(meetingLng) || 106.8456),
+          same_meeting_location: sameMeetingLocation,
+          location_notes: locationNotes.trim() || undefined,
           difficulty,
           visibility,
           max_participants: parsedMax,
@@ -164,11 +176,11 @@ export default function CreateEventPage() {
             />
           </div>
 
-          {/* Lokasi & Meeting Point */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Lokasi Destinasi Mancing */}
+          <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-brand-text uppercase tracking-wider mb-2">
-                Destinasi Tujuan *
+                Nama Destinasi / Spot Mancing *
               </label>
               <input
                 type="text"
@@ -180,38 +192,104 @@ export default function CreateEventPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-brand-text uppercase tracking-wider mb-2">
-                Titik Temu / Janjian *
+            <LocationMapPicker
+              label="Pilih Lokasi Mancing di Peta Google Maps"
+              address={destinationAddress}
+              latitude={destinationLat}
+              longitude={destinationLng}
+              onAddressChange={(newAddr) => {
+                setDestinationAddress(newAddr);
+                if (!destinationName) {
+                  setDestinationName(newAddr.split(",")[0] || newAddr);
+                }
+              }}
+              onCoordinateChange={(lat, lng) => {
+                setDestinationLat(lat);
+                setDestinationLng(lng);
+              }}
+            />
+          </div>
+
+          {/* Opsi Lokasi Janjian / Meeting Point */}
+          <div className="p-5 rounded-2xl bg-brand-background border border-brand-border space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-brand-primary">Titik Temu / Lokasi Janjian</h3>
+                <p className="text-xs text-brand-muted">Tentukan tempat kumpul sebelum berangkat atau langsung di spot</p>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-brand-primary">
+                <input
+                  type="checkbox"
+                  checked={sameMeetingLocation}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setSameMeetingLocation(checked);
+                    if (checked) {
+                      setMeetingPoint(destinationName || "Langsung di Lokasi Mancing");
+                      setMeetingAddress(destinationAddress);
+                      setMeetingLat(destinationLat);
+                      setMeetingLng(destinationLng);
+                    }
+                  }}
+                  className="w-4 h-4 rounded border-brand-border text-brand-secondary focus:ring-brand-secondary"
+                />
+                <span>Janjian di lokasi mancing yang sama</span>
               </label>
-              <input
-                type="text"
-                required
-                value={meetingPoint}
-                onChange={(e) => setMeetingPoint(e.target.value)}
-                placeholder="Contoh: Parkiran Indomaret Pintu Tol"
-                className="w-full px-4 py-2.5 rounded-xl border border-brand-border bg-brand-background text-brand-text text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary"
+            </div>
+
+            {!sameMeetingLocation ? (
+              <div className="space-y-4 pt-2 border-t border-brand-border/60">
+                <div>
+                  <label className="block text-xs font-semibold text-brand-text uppercase tracking-wider mb-2">
+                    Nama Titik Temu / Titik Kumpul *
+                  </label>
+                  <input
+                    type="text"
+                    required={!sameMeetingLocation}
+                    value={meetingPoint}
+                    onChange={(e) => setMeetingPoint(e.target.value)}
+                    placeholder="Contoh: Parkiran Indomaret Rest Area KM 57"
+                    className="w-full px-4 py-2.5 rounded-xl border border-brand-border bg-brand-surface text-brand-text text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary"
+                  />
+                </div>
+
+                <LocationMapPicker
+                  label="Pilih Titik Temu di Peta Google Maps"
+                  address={meetingAddress}
+                  latitude={meetingLat}
+                  longitude={meetingLng}
+                  onAddressChange={(newAddr) => {
+                    setMeetingAddress(newAddr);
+                    if (!meetingPoint) {
+                      setMeetingPoint(newAddr.split(",")[0] || newAddr);
+                    }
+                  }}
+                  onCoordinateChange={(lat, lng) => {
+                    setMeetingLat(lat);
+                    setMeetingLng(lng);
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="p-3 bg-brand-surface rounded-xl border border-brand-border text-xs text-brand-muted flex items-center gap-2">
+                <span className="font-semibold text-brand-secondary">✓ Titik kumpul:</span>
+                <span>Peserta akan langsung bertemu di lokasi mancing ({destinationName || destinationAddress || "Sesuai titik peta destinasi"}).</span>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold text-brand-text uppercase tracking-wider mb-1.5">
+                Petunjuk / Catatan Tambahan Titik Kumpul (Opsional)
+              </label>
+              <textarea
+                rows={2}
+                value={locationNotes}
+                onChange={(e) => setLocationNotes(e.target.value)}
+                placeholder="Contoh: Kumpul di samping musholla dekat gerbang timur. Kontak HP koordinator: 0812xxxx"
+                className="w-full p-3 rounded-xl border border-brand-border bg-brand-surface text-brand-text text-xs focus:outline-none focus:ring-2 focus:ring-brand-secondary"
               />
             </div>
           </div>
-
-          {/* Lokasi Peta & Alamat Destinasi via Google Maps / OSM */}
-          <LocationMapPicker
-            label="Cari Lokasi Destinasi di Peta / Google Maps"
-            address={destinationAddress}
-            latitude={destinationLat}
-            longitude={destinationLng}
-            onAddressChange={(newAddr) => {
-              setDestinationAddress(newAddr);
-              if (!destinationName) {
-                setDestinationName(newAddr.split(",")[0] || newAddr);
-              }
-            }}
-            onCoordinateChange={(lat, lng) => {
-              setDestinationLat(lat);
-              setDestinationLng(lng);
-            }}
-          />
 
           {/* Tanggal & Waktu */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

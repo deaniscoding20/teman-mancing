@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Calendar,
+  Compass,
   MapPin,
   Clock,
   Users,
@@ -37,6 +38,11 @@ interface EventDetail {
   start_time: string;
   end_time?: string;
   meeting_point: string;
+  meeting_address?: string;
+  meeting_latitude?: number;
+  meeting_longitude?: number;
+  same_meeting_location?: boolean;
+  location_notes?: string;
   difficulty: string;
   has_parking_fee: boolean;
   parking_fee?: number;
@@ -226,39 +232,79 @@ export default function EventDetailPage() {
         </div>
 
         {/* Meeting point & Google Maps Navigation */}
-        <div className="mt-8 p-5 rounded-2xl bg-brand-background border border-brand-border">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-brand-primary flex items-center gap-1.5">
-              <MapPin className="w-4 h-4 text-brand-secondary" /> Titik Kumpul (Meeting Point) & Lokasi
-            </h3>
+        <div className="mt-8 p-5 rounded-2xl bg-brand-background border border-brand-border space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-brand-border/60">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-brand-primary flex items-center gap-1.5">
+                <Compass className="w-4 h-4 text-brand-secondary" /> Destinasi Mancing
+              </h3>
+              <p className="text-sm font-bold text-brand-text mt-0.5">{event.destination_name}</p>
+              <p className="text-xs text-brand-muted">{event.destination_address}</p>
+            </div>
             <div className="flex items-center gap-2">
               <a
                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                  event.meeting_point + " " + event.destination_address
+                  event.destination_name + " " + event.destination_address
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-xs font-semibold text-brand-secondary hover:underline"
               >
-                <span>Google Maps</span>
+                <span>Peta Google Maps</span>
                 <ExternalLink className="w-3 h-3" />
               </a>
               <span className="text-brand-border">|</span>
               <a
                 href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
-                  event.meeting_point + " " + event.destination_address
+                  event.destination_name + " " + event.destination_address
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-xs font-semibold text-brand-secondary hover:underline"
               >
-                <span>Rute Petunjuk Arah</span>
+                <span>Rute ke Spot</span>
                 <ExternalLink className="w-3 h-3" />
               </a>
             </div>
           </div>
-          <p className="text-sm font-semibold text-brand-text">{event.meeting_point}</p>
-          <p className="text-xs text-brand-muted mt-1">{event.destination_address}</p>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-brand-primary flex items-center gap-1.5">
+                <MapPin className="w-4 h-4 text-brand-secondary" /> Titik Kumpul (Meeting Point)
+              </h3>
+              <p className="text-sm font-bold text-brand-text mt-0.5">
+                {event.same_meeting_location
+                  ? `Langsung di Lokasi Mancing (${event.destination_name})`
+                  : event.meeting_point}
+              </p>
+              {event.meeting_address && !event.same_meeting_location && (
+                <p className="text-xs text-brand-muted">{event.meeting_address}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                  (event.same_meeting_location ? event.destination_name : event.meeting_point) +
+                    " " +
+                    (event.meeting_address || event.destination_address)
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-brand-secondary hover:underline"
+              >
+                <span>Peta Titik Temu</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+
+          {event.location_notes && (
+            <div className="p-3 bg-brand-surface rounded-xl border border-brand-border text-xs text-brand-text">
+              <span className="font-bold text-brand-primary">Petunjuk Tambahan: </span>
+              <span className="text-brand-muted">{event.location_notes}</span>
+            </div>
+          )}
         </div>
 
         {/* Cost Breakdown (README Section 8.2 & 8.3) */}
