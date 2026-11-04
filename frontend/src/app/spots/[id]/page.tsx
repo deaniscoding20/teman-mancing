@@ -76,7 +76,30 @@ export default function SpotDetailPage() {
       fetchApi<SpotComment[]>(`/spots/${spotId}/comments`),
     ])
       .then(([spotRes, commentsRes]) => {
-        if (spotRes.data) setSpot(spotRes.data);
+        if (spotRes.data) {
+          const spotData = spotRes.data;
+          setSpot(spotData);
+
+          // Track recently viewed spots for authenticated user (Issue #21)
+          if (currentUser?.id) {
+            try {
+              const storageKey = `recent_spots_${currentUser.id}`;
+              const existingRaw = localStorage.getItem(storageKey);
+              let existing: any[] = existingRaw ? JSON.parse(existingRaw) : [];
+              existing = existing.filter((s: any) => s.id !== spotData.id);
+              existing.unshift({
+                id: spotData.id,
+                name: spotData.name,
+                address: spotData.address,
+                primary_photo_url: spotData.primary_photo_url || spotData.photos?.[0]?.url,
+                viewed_at: new Date().toISOString(),
+              });
+              localStorage.setItem(storageKey, JSON.stringify(existing.slice(0, 8)));
+            } catch (e) {
+              // ignore storage errors
+            }
+          }
+        }
         if (commentsRes.data) setComments(commentsRes.data);
       })
       .catch((err) => {

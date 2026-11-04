@@ -8,13 +8,15 @@ import (
 )
 
 type ListEventsFilter struct {
-	Page       int
-	Limit      int
-	Query      string
-	Date       string
-	Difficulty string
-	Visibility string
-	Status     string
+	Page          int
+	Limit         int
+	Query         string
+	CreatorID     *uuid.UUID
+	ParticipantID *uuid.UUID
+	Date          string
+	Difficulty    string
+	Visibility    string
+	Status        string
 }
 
 type Repository interface {

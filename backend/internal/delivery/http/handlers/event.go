@@ -84,14 +84,30 @@ func (h *EventHandler) List(c *gin.Context) {
 	visibility := c.Query("visibility")
 	status := c.Query("status")
 
+	var filterCreatorID *uuid.UUID
+	if cidStr := c.Query("creator_id"); cidStr != "" {
+		if cid, err := uuid.Parse(cidStr); err == nil {
+			filterCreatorID = &cid
+		}
+	}
+
+	var filterParticipantID *uuid.UUID
+	if pidStr := c.Query("participant_id"); pidStr != "" {
+		if pid, err := uuid.Parse(pidStr); err == nil {
+			filterParticipantID = &pid
+		}
+	}
+
 	events, total, err := h.eventService.ListEvents(c.Request.Context(), appevent.ListEventsFilter{
-		Page:       page,
-		Limit:      limit,
-		Query:      query,
-		Date:       date,
-		Difficulty: difficulty,
-		Visibility: visibility,
-		Status:     status,
+		Page:          page,
+		Limit:         limit,
+		Query:         query,
+		CreatorID:     filterCreatorID,
+		ParticipantID: filterParticipantID,
+		Date:          date,
+		Difficulty:    difficulty,
+		Visibility:    visibility,
+		Status:        status,
 	})
 	if err != nil {
 		dto.Error(c, http.StatusInternalServerError, "Failed to retrieve events")

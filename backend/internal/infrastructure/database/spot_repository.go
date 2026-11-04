@@ -34,6 +34,10 @@ func (r *GormSpotRepository) List(ctx context.Context, filter appspot.ListSpotsF
 		q = q.Where("LOWER(name) LIKE ? OR LOWER(address) LIKE ? OR LOWER(description) LIKE ?", term, term, term)
 	}
 
+	if filter.UserID != nil {
+		q = q.Where("user_id = ?", *filter.UserID)
+	}
+
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
@@ -250,6 +254,9 @@ func (r *InMemorySpotRepository) List(ctx context.Context, filter appspot.ListSp
 			if !strings.Contains(strings.ToLower(s.Name), q) && !strings.Contains(strings.ToLower(s.Address), q) {
 				continue
 			}
+		}
+		if filter.UserID != nil && s.UserID != *filter.UserID {
+			continue
 		}
 		result = append(result, s)
 	}

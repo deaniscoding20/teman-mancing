@@ -43,6 +43,13 @@ func (r *GormEventRepository) List(ctx context.Context, filter appevent.ListEven
 	if filter.Status != "" {
 		q = q.Where("status = ?", filter.Status)
 	}
+	if filter.CreatorID != nil {
+		q = q.Where("creator_id = ?", *filter.CreatorID)
+	}
+	if filter.ParticipantID != nil {
+		q = q.Joins("JOIN event_participants ON event_participants.event_id = events.id").
+			Where("event_participants.user_id = ? AND event_participants.status = 'approved'", *filter.ParticipantID)
+	}
 
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -342,6 +349,16 @@ func (r *InMemoryEventRepository) List(ctx context.Context, filter appevent.List
 		}
 		if filter.Visibility != "" && ev.Visibility != filter.Visibility {
 			continue
+		}
+		if filter.CreatorID != nil && ev.CreatorID != *filter.CreatorID {
+			continue
+		}
+		if filter.ParticipantID != nil {
+			key := ev.ID.String() + "_" + filter.ParticipantID.String()
+			p, exists := r.participants[key]
+			if !exists || p.Status != domainevent.ParticipantStatusApproved {
+				continue
+			}
 		}
 		result = append(result, ev)
 	}

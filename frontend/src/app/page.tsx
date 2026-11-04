@@ -1,8 +1,34 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Compass, Calendar, Users, MapPin, ArrowRight, ShieldCheck, Waves } from "lucide-react";
+import { getStoredUser, getToken } from "@/lib/auth";
 import HomeCTAButton from "@/components/home/HomeCTAButton";
+import UserDashboard from "@/components/home/UserDashboard";
 
 export default function HomePage() {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const update = () => {
+      const token = getToken();
+      const user = getStoredUser();
+      setCurrentUser(token && user ? user : null);
+    };
+    update();
+    setMounted(true);
+    window.addEventListener("auth-change", update);
+    return () => window.removeEventListener("auth-change", update);
+  }, []);
+
+  // Show authenticated dashboard if logged in
+  if (mounted && currentUser) {
+    return <UserDashboard />;
+  }
+
+  // Public Landing Page for Guests
   return (
     <div className="flex flex-col gap-16 py-10">
       {/* Hero Section */}
