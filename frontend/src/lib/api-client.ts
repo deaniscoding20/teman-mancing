@@ -73,5 +73,9 @@ export function resolveMediaUrl(url?: string): string | undefined {
     const origin = base.replace(/\/api\/v1\/?$/, "");
     return `${origin}${url}`;
   }
-  return `${base.replace(/\/$/, "")}/${url.replace(/^\//, "")}`;
+  const cleanUrl = url.replace(/^\//, "");
+  if (!cleanUrl.startsWith("media/")) {
+    return `${base.replace(/\/$/, "")}/media/${cleanUrl}`;
+  }
+  return `${base.replace(/\/$/, "")}/${cleanUrl}`;
 }

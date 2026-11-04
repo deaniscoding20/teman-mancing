@@ -127,8 +127,11 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 	userHandler := handlers.NewUserHandler(authService, deps.MinIO)
 	mediaHandler := handlers.NewMediaHandler(deps.MinIO)
 
+	notifService := appnotif.NewService(notifRepo)
+	notifHandler := handlers.NewNotificationHandler(notifService)
+
 	spotService := appspot.NewService(spotRepo)
-	spotHandler := handlers.NewSpotHandler(spotService, deps.MinIO)
+	spotHandler := handlers.NewSpotHandler(spotService, deps.MinIO, notifService)
 
 	eventService := appevent.NewService(eventRepo)
 	eventHandler := handlers.NewEventHandler(eventService)
@@ -136,9 +139,6 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 	chatService := appchat.NewService(chatRepo)
 	wsHub := infraWS.NewHub(chatService, deps.Logger)
 	chatHandler := handlers.NewChatHandler(chatService, eventRepo, wsHub)
-
-	notifService := appnotif.NewService(notifRepo)
-	notifHandler := handlers.NewNotificationHandler(notifService)
 
 	// API v1 Group
 	v1 := r.Group("/api/v1")
@@ -192,6 +192,7 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 			// Comments
 			spotsGroup.GET("/:id/comments", spotHandler.ListComments)
 			spotsGroup.POST("/:id/comments", authMiddleware, verifiedMiddleware, spotHandler.CreateComment)
+			spotsGroup.POST("/:id/comments/photo", authMiddleware, verifiedMiddleware, spotHandler.UploadCommentPhoto)
 		}
 
 		// Comments direct endpoint (README Section 13)

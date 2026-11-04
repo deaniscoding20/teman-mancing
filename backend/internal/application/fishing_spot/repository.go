@@ -34,6 +34,7 @@ type Repository interface {
 	// Comments
 	ListComments(ctx context.Context, spotID uuid.UUID, page, limit int) ([]*domainspot.Comment, int64, error)
 	GetCommentByID(ctx context.Context, commentID uuid.UUID) (*domainspot.Comment, error)
+	GetSpotCommenterIDs(ctx context.Context, spotID uuid.UUID) ([]uuid.UUID, error)
 	CreateComment(ctx context.Context, comment *domainspot.Comment) error
 	DeleteComment(ctx context.Context, commentID uuid.UUID) error
 
