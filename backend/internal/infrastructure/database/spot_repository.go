@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
@@ -152,32 +153,100 @@ func (r *GormSpotRepository) GetPhotoByID(ctx context.Context, photoID uuid.UUID
 }
 
 func (r *GormSpotRepository) ListComments(ctx context.Context, spotID uuid.UUID, page, limit int) ([]*domainspot.Comment, int64, error) {
-	var comments []*domainspot.Comment
-	var total int64
+	var rootComments []*domainspot.Comment
+	var totalRoots int64
 
-	q := r.db.WithContext(ctx).Table("spot_comments").Where("spot_id = ?", spotID)
-	if err := q.Count(&total).Error; err != nil {
+	q := r.db.WithContext(ctx).Table("spot_comments").Where("spot_id = ? AND parent_id IS NULL", spotID)
+	if err := q.Count(&totalRoots).Error; err != nil {
 		return nil, 0, err
 	}
 
 	offset := (page - 1) * limit
-	if err := q.Order("created_at DESC").Offset(offset).Limit(limit).Find(&comments).Error; err != nil {
+	if err := q.Order("created_at DESC").Offset(offset).Limit(limit).Find(&rootComments).Error; err != nil {
 		return nil, 0, err
 	}
 
-	// Join user details
-	for _, c := range comments {
-		var u struct {
-			Name      string
-			AvatarKey *string
-		}
-		if err := r.db.WithContext(ctx).Table("users").Select("name, avatar_key").Where("id = ?", c.UserID).Scan(&u).Error; err == nil {
-			c.UserName = u.Name
-			c.UserAvatar = u.AvatarKey
+	if len(rootComments) == 0 {
+		return []*domainspot.Comment{}, totalRoots, nil
+	}
+
+	// Collect root comment IDs
+	rootIDs := make([]uuid.UUID, len(rootComments))
+	rootMap := make(map[uuid.UUID]*domainspot.Comment, len(rootComments))
+	for i, rc := range rootComments {
+		rc.Replies = make([]*domainspot.Comment, 0)
+		rootIDs[i] = rc.ID
+		rootMap[rc.ID] = rc
+	}
+
+	// Fetch replies belonging to these root comments
+	var replies []*domainspot.Comment
+	if err := r.db.WithContext(ctx).Table("spot_comments").
+		Where("parent_id IN (?)", rootIDs).
+		Order("created_at ASC").
+		Find(&replies).Error; err != nil {
+		return nil, 0, err
+	}
+
+	for _, rep := range replies {
+		rep.Replies = make([]*domainspot.Comment, 0)
+		if rep.ParentID != nil {
+			if parent, exists := rootMap[*rep.ParentID]; exists {
+				parent.Replies = append(parent.Replies, rep)
+			}
 		}
 	}
 
-	return comments, total, nil
+	// Enrich user info for all comments (roots + replies)
+	allComments := append(rootComments, replies...)
+	userIDs := make(map[uuid.UUID]bool)
+	for _, c := range allComments {
+		userIDs[c.UserID] = true
+	}
+
+	if len(userIDs) > 0 {
+		var uList []struct {
+			ID        uuid.UUID
+			Name      string
+			AvatarKey *string
+		}
+		var ids []uuid.UUID
+		for uid := range userIDs {
+			ids = append(ids, uid)
+		}
+		if err := r.db.WithContext(ctx).Table("users").Select("id, name, avatar_key").Where("id IN (?)", ids).Scan(&uList).Error; err == nil {
+			uMap := make(map[uuid.UUID]struct {
+				Name      string
+				AvatarKey *string
+			})
+			for _, u := range uList {
+				uMap[u.ID] = struct {
+					Name      string
+					AvatarKey *string
+				}{Name: u.Name, AvatarKey: u.AvatarKey}
+			}
+			for _, c := range allComments {
+				if u, ok := uMap[c.UserID]; ok {
+					c.UserName = u.Name
+					c.UserAvatar = u.AvatarKey
+				}
+			}
+		}
+	}
+
+	return rootComments, totalRoots, nil
+}
+
+func (r *GormSpotRepository) GetSpotCommenterIDs(ctx context.Context, spotID uuid.UUID) ([]uuid.UUID, error) {
+	var userIDs []uuid.UUID
+	err := r.db.WithContext(ctx).Table("spot_comments").
+		Distinct("user_id").
+		Where("spot_id = ?", spotID).
+		Pluck("user_id", &userIDs).Error
+	if err != nil {
+		return nil, err
+	}
+	return userIDs, nil
 }
 
 func (r *GormSpotRepository) GetCommentByID(ctx context.Context, commentID uuid.UUID) (*domainspot.Comment, error) {
@@ -354,24 +423,74 @@ func (r *InMemorySpotRepository) ListComments(ctx context.Context, spotID uuid.U
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	var result []*domainspot.Comment
+	var roots []*domainspot.Comment
+	var replies []*domainspot.Comment
+
 	for _, c := range r.comments {
 		if c.SpotID == spotID {
-			result = append(result, c)
+			// Clone comment to safely populate replies without mutating store directly
+			cloned := *c
+			cloned.Replies = make([]*domainspot.Comment, 0)
+			if c.ParentID == nil {
+				roots = append(roots, &cloned)
+			} else {
+				replies = append(replies, &cloned)
+			}
 		}
 	}
 
-	total := int64(len(result))
+	// Sort roots by created_at DESC
+	sort.Slice(roots, func(i, j int) bool {
+		return roots[i].CreatedAt.After(roots[j].CreatedAt)
+	})
+
+	// Sort replies by created_at ASC
+	sort.Slice(replies, func(i, j int) bool {
+		return replies[i].CreatedAt.Before(replies[j].CreatedAt)
+	})
+
+	rootMap := make(map[uuid.UUID]*domainspot.Comment)
+	for _, root := range roots {
+		rootMap[root.ID] = root
+	}
+
+	for _, rep := range replies {
+		if rep.ParentID != nil {
+			if parent, exists := rootMap[*rep.ParentID]; exists {
+				parent.Replies = append(parent.Replies, rep)
+			}
+		}
+	}
+
+	total := int64(len(roots))
 	start := (page - 1) * limit
-	if start >= len(result) {
+	if start >= len(roots) {
 		return []*domainspot.Comment{}, total, nil
 	}
 	end := start + limit
-	if end > len(result) {
-		end = len(result)
+	if end > len(roots) {
+		end = len(roots)
 	}
 
-	return result[start:end], total, nil
+	return roots[start:end], total, nil
+}
+
+func (r *InMemorySpotRepository) GetSpotCommenterIDs(ctx context.Context, spotID uuid.UUID) ([]uuid.UUID, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	idMap := make(map[uuid.UUID]bool)
+	for _, c := range r.comments {
+		if c.SpotID == spotID {
+			idMap[c.UserID] = true
+		}
+	}
+
+	var userIDs []uuid.UUID
+	for id := range idMap {
+		userIDs = append(userIDs, id)
+	}
+	return userIDs, nil
 }
 
 func (r *InMemorySpotRepository) GetCommentByID(ctx context.Context, commentID uuid.UUID) (*domainspot.Comment, error) {
@@ -403,6 +522,15 @@ func (r *InMemorySpotRepository) DeleteComment(ctx context.Context, commentID uu
 			s.CommentsCount--
 		}
 		delete(r.comments, commentID)
+		// Cascade delete child replies
+		for id, rep := range r.comments {
+			if rep.ParentID != nil && *rep.ParentID == commentID {
+				delete(r.comments, id)
+				if s, exists := r.spots[rep.SpotID]; exists {
+					s.CommentsCount--
+				}
+			}
+		}
 	}
 	return nil
 }
