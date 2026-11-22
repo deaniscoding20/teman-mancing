@@ -67,12 +67,15 @@ type RecommendedBait struct {
 
 // Comment represents community reviews on a spot.
 type Comment struct {
-	ID        uuid.UUID `json:"id"`
-	SpotID    uuid.UUID `json:"spot_id"`
-	UserID    uuid.UUID `json:"user_id"`
-	UserName  string    `json:"user_name,omitempty" gorm:"-"`
-	UserAvatar *string  `json:"user_avatar,omitempty" gorm:"-"`
-	Comment   string    `json:"comment"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID         uuid.UUID  `json:"id"`
+	SpotID     uuid.UUID  `json:"spot_id"`
+	UserID     uuid.UUID  `json:"user_id"`
+	UserName   string     `json:"user_name,omitempty" gorm:"-"`
+	UserAvatar *string    `json:"user_avatar,omitempty" gorm:"-"`
+	ParentID   *uuid.UUID `json:"parent_id,omitempty"`
+	PhotoURL   *string    `json:"photo_url,omitempty"`
+	Replies    []*Comment `json:"replies,omitempty" gorm:"-"`
+	Comment    string     `json:"comment"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
 }

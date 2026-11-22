@@ -11,15 +11,17 @@ import (
 	"go.uber.org/zap"
 
 	"teman-mancing/backend/internal/application/auth"
+	appnotif "teman-mancing/backend/internal/application/notification"
 	"teman-mancing/backend/internal/config"
 	"teman-mancing/backend/internal/delivery/http/dto"
 	"teman-mancing/backend/internal/delivery/http/routes"
 	domainspot "teman-mancing/backend/internal/domain/fishing_spot"
 	"teman-mancing/backend/internal/infrastructure/database"
 	"teman-mancing/backend/internal/infrastructure/security"
+	"github.com/google/uuid"
 )
 
-func setupSpotTestRouter() (http.Handler, string, string) {
+func setupSpotTestRouter() (http.Handler, string, string, appnotif.Repository, uuid.UUID, uuid.UUID) {
 	cfg := &config.Config{
 		AppEnv:         "test",
 		AppPort:        8080,
@@ -30,17 +32,19 @@ func setupSpotTestRouter() (http.Handler, string, string) {
 	logger := zap.NewNop()
 	userRepo := database.NewInMemoryUserRepository()
 	spotRepo := database.NewInMemorySpotRepository()
+	notifRepo := database.NewInMemoryNotificationRepository()
 	tokenService := security.NewTokenService(cfg.JWTSecret, cfg.JWTExpiration)
 
 	router := routes.SetupRouter(routes.RouterDeps{
-		Config:       cfg,
-		Logger:       logger,
-		DB:           nil,
-		MinIO:        nil,
-		TokenService: tokenService,
-		UserRepo:     userRepo,
-		SpotRepo:     spotRepo,
-		Version:      "1.0.0-test",
+		Config:           cfg,
+		Logger:           logger,
+		DB:               nil,
+		MinIO:            nil,
+		TokenService:     tokenService,
+		UserRepo:         userRepo,
+		SpotRepo:         spotRepo,
+		NotificationRepo: notifRepo,
+		Version:          "1.0.0-test",
 	})
 
 	authService := auth.NewAuthService(userRepo, tokenService, nil)
@@ -65,11 +69,11 @@ func setupSpotTestRouter() (http.Handler, string, string) {
 	u2.User.IsVerified = true
 	_ = userRepo.Update(nil, u2.User)
 
-	return router, u1.Token, u2.Token
+	return router, u1.Token, u2.Token, notifRepo, u1.User.ID, u2.User.ID
 }
 
 func TestFishingSpotCRUDAndOwnership(t *testing.T) {
-	router, tokenA, tokenB := setupSpotTestRouter()
+	router, tokenA, tokenB, _, _, _ := setupSpotTestRouter()
 
 	// 1. Create Spot by User A
 	createPayload := map[string]any{
@@ -216,5 +220,116 @@ func TestFishingSpotCRUDAndOwnership(t *testing.T) {
 
 	if wDelA.Code != http.StatusOK {
 		t.Errorf("expected 200 OK when owner deletes spot, got %d", wDelA.Code)
+	}
+}
+
+func TestSpotCommentsRepliesAndNotifications(t *testing.T) {
+	router, tokenA, tokenB, notifRepo, userAID, _ := setupSpotTestRouter()
+
+	// 1. User A creates a spot
+	createPayload := map[string]any{
+		"name":        "Spot Uji Komentar",
+		"description": "Spot pengujian thread komentar dan notifikasi.",
+		"address":     "Pantai Mutiara, Jakarta",
+		"latitude":    -6.1105,
+		"longitude":   106.7900,
+	}
+	body, _ := json.Marshal(createPayload)
+	reqSpot, _ := http.NewRequest(http.MethodPost, "/api/v1/spots", bytes.NewBuffer(body))
+	reqSpot.Header.Set("Authorization", "Bearer "+tokenA)
+	reqSpot.Header.Set("Content-Type", "application/json")
+	wSpot := httptest.NewRecorder()
+	router.ServeHTTP(wSpot, reqSpot)
+
+	if wSpot.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for spot, got %d", wSpot.Code)
+	}
+
+	var spotRes struct {
+		Data struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	_ = json.Unmarshal(wSpot.Body.Bytes(), &spotRes)
+	spotID := spotRes.Data.ID
+
+	// 2. User B posts root comment with photo on User A's spot
+	commentPayload := map[string]any{
+		"comment":   "Spotnya gacor banget! Ini hasil ikan babon tadi pagi.",
+		"photo_url": "fishing-spots/" + spotID + "/comments/babon.jpg",
+	}
+	cBody, _ := json.Marshal(commentPayload)
+	reqC1, _ := http.NewRequest(http.MethodPost, "/api/v1/spots/"+spotID+"/comments", bytes.NewBuffer(cBody))
+	reqC1.Header.Set("Authorization", "Bearer "+tokenB)
+	reqC1.Header.Set("Content-Type", "application/json")
+	wC1 := httptest.NewRecorder()
+	router.ServeHTTP(wC1, reqC1)
+
+	if wC1.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for comment, got %d: %s", wC1.Code, wC1.Body.String())
+	}
+
+	var c1Res struct {
+		Data struct {
+			ID       string  `json:"id"`
+			Comment  string  `json:"comment"`
+			PhotoURL *string `json:"photo_url"`
+		} `json:"data"`
+	}
+	_ = json.Unmarshal(wC1.Body.Bytes(), &c1Res)
+	parentID := c1Res.Data.ID
+
+	if c1Res.Data.PhotoURL == nil || *c1Res.Data.PhotoURL != "fishing-spots/"+spotID+"/comments/babon.jpg" {
+		t.Fatalf("expected comment photo_url to match, got %v", c1Res.Data.PhotoURL)
+	}
+
+	// Wait briefly for asynchronous notification goroutine
+	time.Sleep(50 * time.Millisecond)
+
+	// User A (spot owner) should receive a notification
+	notifsA, _, _ := notifRepo.List(nil, userAID, 10, 0)
+	if len(notifsA) == 0 {
+		t.Fatalf("expected spot author User A to receive notification on new comment")
+	}
+
+	// 3. User A replies to User B's comment
+	replyPayload := map[string]any{
+		"comment":   "Mantap mas! Pake umpan apa tadi?",
+		"parent_id": parentID,
+	}
+	rBody, _ := json.Marshal(replyPayload)
+	reqReply, _ := http.NewRequest(http.MethodPost, "/api/v1/spots/"+spotID+"/comments", bytes.NewBuffer(rBody))
+	reqReply.Header.Set("Authorization", "Bearer "+tokenA)
+	reqReply.Header.Set("Content-Type", "application/json")
+	wReply := httptest.NewRecorder()
+	router.ServeHTTP(wReply, reqReply)
+
+	if wReply.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for reply comment, got %d: %s", wReply.Code, wReply.Body.String())
+	}
+
+	// 4. List comments and check threaded structure (Issue #20 Acceptance Criteria)
+	reqListC, _ := http.NewRequest(http.MethodGet, "/api/v1/spots/"+spotID+"/comments", nil)
+	wListC := httptest.NewRecorder()
+	router.ServeHTTP(wListC, reqListC)
+
+	if wListC.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for list comments, got %d", wListC.Code)
+	}
+
+	var listCommentsRes struct {
+		Data []*domainspot.Comment `json:"data"`
+	}
+	_ = json.Unmarshal(wListC.Body.Bytes(), &listCommentsRes)
+
+	if len(listCommentsRes.Data) != 1 {
+		t.Fatalf("expected 1 root comment, got %d", len(listCommentsRes.Data))
+	}
+	rootComment := listCommentsRes.Data[0]
+	if len(rootComment.Replies) != 1 {
+		t.Fatalf("expected 1 threaded reply inside root comment, got %d", len(rootComment.Replies))
+	}
+	if rootComment.Replies[0].Comment != "Mantap mas! Pake umpan apa tadi?" {
+		t.Errorf("unexpected reply text: %s", rootComment.Replies[0].Comment)
 	}
 }

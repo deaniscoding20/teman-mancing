@@ -14,6 +14,11 @@ import {
   Edit3,
   ExternalLink,
   Send,
+  Reply,
+  Image as ImageIcon,
+  CornerDownRight,
+  X,
+  Loader2,
 } from "lucide-react";
 import { fetchApi, resolveMediaUrl } from "@/lib/api-client";
 import { getStoredUser, getToken } from "@/lib/auth";
@@ -48,6 +53,9 @@ interface SpotComment {
   user_id: string;
   user_name?: string;
   user_avatar?: string;
+  parent_id?: string;
+  photo_url?: string;
+  replies?: SpotComment[];
   comment: string;
   created_at: string;
 }
@@ -60,9 +68,18 @@ export default function SpotDetailPage() {
   const [spot, setSpot] = useState<SpotDetail | null>(null);
   const [comments, setComments] = useState<SpotComment[]>([]);
   const [newComment, setNewComment] = useState("");
+  const [commentPhoto, setCommentPhoto] = useState<File | null>(null);
+  const [commentPhotoPreview, setCommentPhotoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submittingComment, setSubmittingComment] = useState(false);
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
+
+  // Threaded replies state (Issue #20)
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [replyPhoto, setReplyPhoto] = useState<File | null>(null);
+  const [replyPhotoPreview, setReplyPhotoPreview] = useState<string | null>(null);
+  const [submittingReply, setSubmittingReply] = useState(false);
 
   const currentUser = getStoredUser();
   const token = getToken();
@@ -110,23 +127,41 @@ export default function SpotDetailPage() {
       });
   }, [spotId]);
 
+  const uploadPhotoFile = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("photo", file);
+    const res = await fetchApi<{ photo_url: string }>(`/spots/${spotId}/comments/photo`, {
+      method: "POST",
+      body: formData,
+    });
+    return res.data?.photo_url || "";
+  };
+
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !newComment.trim()) return;
+    if (!token || (!newComment.trim() && !commentPhoto)) return;
 
     setSubmittingComment(true);
     try {
+      let photoUrl: string | undefined = undefined;
+      if (commentPhoto) {
+        photoUrl = await uploadPhotoFile(commentPhoto);
+      }
+
       const res = await fetchApi<SpotComment>(`/spots/${spotId}/comments`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ comment: newComment }),
+        body: JSON.stringify({
+          comment: newComment.trim(),
+          photo_url: photoUrl,
+        }),
       });
 
       if (res.data) {
-        setComments((prev) => [res.data!, ...prev]);
+        const posted = { ...res.data, replies: [] };
+        setComments((prev) => [posted, ...prev]);
         setNewComment("");
+        setCommentPhoto(null);
+        setCommentPhotoPreview(null);
       }
     } catch (err: any) {
       alert(err.message || "Gagal mengirim komentar.");
@@ -135,17 +170,73 @@ export default function SpotDetailPage() {
     }
   };
 
-  const handleDeleteComment = async (commentId: string) => {
+  const handlePostReply = async (parentId: string) => {
+    if (!token || (!replyText.trim() && !replyPhoto)) return;
+
+    setSubmittingReply(true);
+    try {
+      let photoUrl: string | undefined = undefined;
+      if (replyPhoto) {
+        photoUrl = await uploadPhotoFile(replyPhoto);
+      }
+
+      const res = await fetchApi<SpotComment>(`/spots/${spotId}/comments`, {
+        method: "POST",
+        body: JSON.stringify({
+          parent_id: parentId,
+          comment: replyText.trim(),
+          photo_url: photoUrl,
+        }),
+      });
+
+      if (res.data) {
+        const newReply = res.data;
+        setComments((prev) =>
+          prev.map((c) => {
+            if (c.id === parentId) {
+              return {
+                ...c,
+                replies: [...(c.replies || []), newReply],
+              };
+            }
+            return c;
+          })
+        );
+        setReplyText("");
+        setReplyPhoto(null);
+        setReplyPhotoPreview(null);
+        setReplyingToId(null);
+      }
+    } catch (err: any) {
+      alert(err.message || "Gagal mengirim balasan.");
+    } finally {
+      setSubmittingReply(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string, parentId?: string) => {
     if (!token || !confirm("Yakin ingin menghapus komentar ini?")) return;
 
     try {
       await fetchApi(`/comments/${commentId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
-      setComments((prev) => prev.filter((c) => c.id !== commentId));
+
+      if (parentId) {
+        setComments((prev) =>
+          prev.map((c) => {
+            if (c.id === parentId) {
+              return {
+                ...c,
+                replies: (c.replies || []).filter((r) => r.id !== commentId),
+              };
+            }
+            return c;
+          })
+        );
+      } else {
+        setComments((prev) => prev.filter((c) => c.id !== commentId));
+      }
     } catch (err: any) {
       alert(err.message || "Gagal menghapus komentar.");
     }
@@ -384,29 +475,75 @@ export default function SpotDetailPage() {
       <div className="bg-brand-surface rounded-3xl border border-brand-border p-6 sm:p-10 shadow-sm">
         <h2 className="text-xl font-bold text-brand-primary flex items-center gap-2.5 mb-6">
           <MessageSquare className="w-5 h-5 text-brand-secondary" />
-          Ulasan & Diskusi Pemancing ({comments.length})
+          Ulasan & Diskusi Pemancing (
+          {comments.reduce((acc, c) => acc + 1 + (c.replies?.length || 0), 0)}
+          )
         </h2>
 
         {/* Comment input form */}
         {currentUser ? (
           <form onSubmit={handlePostComment} className="mb-8">
-            <div className="flex flex-col gap-2.5">
+            <div className="flex flex-col gap-3">
               <textarea
                 rows={3}
-                required
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Bagikan pengalamanmu mancing di spot ini (kondisi air, hasil sambaran, umpan yang gacor)..."
+                placeholder="Bagikan ulasan atau pengalaman mancing di spot ini (kondisi air, jenis ikan, umpan jitu)..."
                 className="w-full p-4 rounded-2xl border border-brand-border bg-brand-background text-brand-text placeholder-brand-muted/70 text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary transition"
               />
-              <button
-                type="submit"
-                disabled={submittingComment || !newComment.trim()}
-                className="self-end inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-xs shadow-sm transition"
-              >
-                <Send className="w-3.5 h-3.5 text-brand-secondary" />
-                Kirim Komentar
-              </button>
+
+              {/* Photo preview if chosen */}
+              {commentPhotoPreview && (
+                <div className="relative inline-block w-28 h-28 rounded-2xl overflow-hidden border border-brand-border bg-black/5 group">
+                  <img src={commentPhotoPreview} alt="Preview" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCommentPhoto(null);
+                      setCommentPhotoPreview(null);
+                    }}
+                    className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/60 text-white hover:bg-black/80 transition"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-brand-border bg-brand-background text-brand-muted hover:text-brand-primary text-xs font-semibold cursor-pointer hover:border-brand-secondary transition">
+                  <ImageIcon className="w-4 h-4 text-brand-secondary" />
+                  <span>Lampirkan Foto</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        if (file.size > 5 * 1024 * 1024) {
+                          alert("Ukuran foto maksimal 5MB.");
+                          return;
+                        }
+                        setCommentPhoto(file);
+                        setCommentPhotoPreview(URL.createObjectURL(file));
+                      }
+                    }}
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={submittingComment || (!newComment.trim() && !commentPhoto)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-xs shadow-sm transition cursor-pointer"
+                >
+                  {submittingComment ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5 text-brand-secondary" />
+                  )}
+                  <span>Kirim Komentar</span>
+                </button>
+              </div>
             </div>
           </form>
         ) : (
@@ -420,44 +557,252 @@ export default function SpotDetailPage() {
 
         {/* Comments List */}
         {comments.length === 0 ? (
-          <p className="text-center py-8 text-xs text-brand-muted">
-            Belum ada komentar untuk spot ini. Mulai diskusi pertama!
-          </p>
+          <div className="p-8 text-center bg-brand-background rounded-2xl border border-dashed border-brand-border text-xs text-brand-muted">
+            <MessageSquare className="w-8 h-8 text-brand-muted/50 mx-auto mb-2" />
+            <p className="font-bold text-brand-primary">Belum Ada Ulasan</p>
+            <p className="mt-1">Jadilah angler pertama yang membagikan ulasan atau tips mancing di spot ini!</p>
+          </div>
         ) : (
           <div className="space-y-4">
             {comments.map((c) => {
               const isCommentAuthor = currentUser && currentUser.id === c.user_id;
+              const isReplying = replyingToId === c.id;
+
               return (
                 <div
                   key={c.id}
-                  className="p-4 rounded-2xl bg-brand-background border border-brand-border flex items-start justify-between gap-4"
+                  className="p-4 sm:p-5 rounded-2xl bg-brand-background border border-brand-border space-y-3"
                 >
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-xs text-brand-primary">
-                        {c.user_name || "Pemancing"}
-                      </span>
-                      <span className="text-[10px] text-brand-muted">
-                        {new Date(c.created_at).toLocaleDateString("id-ID", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </span>
+                  {/* Root comment header */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-brand-primary/10 border border-brand-border flex items-center justify-center font-bold text-brand-primary text-xs shrink-0 overflow-hidden">
+                        {c.user_avatar ? (
+                          <img src={resolveMediaUrl(c.user_avatar)} alt={c.user_name || "User"} className="w-full h-full object-cover" />
+                        ) : (
+                          <span>{(c.user_name || "A").charAt(0).toUpperCase()}</span>
+                        )}
+                      </div>
+                      <div>
+                        <span className="font-bold text-xs text-brand-primary block leading-tight">
+                          {c.user_name || "Angler"}
+                        </span>
+                        <span className="text-[10px] text-brand-muted">
+                          {new Date(c.created_at).toLocaleDateString("id-ID", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-xs text-brand-text leading-relaxed whitespace-pre-line">
-                      {c.comment}
-                    </p>
+
+                    <div className="flex items-center gap-1">
+                      {currentUser && (
+                        <button
+                          onClick={() => {
+                            if (isReplying) {
+                              setReplyingToId(null);
+                              setReplyText("");
+                              setReplyPhoto(null);
+                              setReplyPhotoPreview(null);
+                            } else {
+                              setReplyingToId(c.id);
+                              setReplyText("");
+                              setReplyPhoto(null);
+                              setReplyPhotoPreview(null);
+                            }
+                          }}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                            isReplying
+                              ? "bg-brand-secondary text-white"
+                              : "text-brand-muted hover:text-brand-primary hover:bg-brand-surface"
+                          }`}
+                        >
+                          <Reply className="w-3.5 h-3.5" />
+                          <span>Balas</span>
+                        </button>
+                      )}
+
+                      {isCommentAuthor && (
+                        <button
+                          onClick={() => handleDeleteComment(c.id)}
+                          className="p-1.5 text-brand-muted hover:text-red-500 rounded-lg transition cursor-pointer"
+                          title="Hapus Komentar"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  {isCommentAuthor && (
-                    <button
-                      onClick={() => handleDeleteComment(c.id)}
-                      className="p-1.5 text-brand-muted hover:text-red-500 rounded-lg transition"
-                      title="Hapus Komentar"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                  {/* Root comment photo if attached */}
+                  {c.photo_url && (
+                    <div className="rounded-xl overflow-hidden max-w-sm border border-brand-border bg-brand-surface">
+                      <img
+                        src={resolveMediaUrl(c.photo_url)}
+                        alt="Foto ulasan spot"
+                        className="w-full max-h-72 object-cover"
+                      />
+                    </div>
+                  )}
+
+                  {/* Root comment text */}
+                  {c.comment && (
+                    <p className="text-xs sm:text-sm text-brand-text leading-relaxed whitespace-pre-line">
+                      {c.comment}
+                    </p>
+                  )}
+
+                  {/* Reply Form (Inline) */}
+                  {isReplying && (
+                    <div className="mt-3 p-3.5 rounded-xl bg-brand-surface border border-brand-secondary/30 space-y-2.5">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-brand-primary">
+                        <CornerDownRight className="w-3.5 h-3.5 text-brand-secondary" />
+                        <span>Balas ulasan {c.user_name || "Angler"}</span>
+                      </div>
+
+                      <textarea
+                        rows={2}
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder={`Tulis balasan untuk ${c.user_name || "angler"}...`}
+                        className="w-full p-2.5 rounded-xl border border-brand-border bg-brand-background text-brand-text text-xs focus:outline-none focus:ring-2 focus:ring-brand-secondary"
+                      />
+
+                      {replyPhotoPreview && (
+                        <div className="relative inline-block w-20 h-20 rounded-xl overflow-hidden border border-brand-border">
+                          <img src={replyPhotoPreview} alt="Preview Balasan" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplyPhoto(null);
+                              setReplyPhotoPreview(null);
+                            }}
+                            className="absolute top-1 right-1 p-0.5 rounded-full bg-black/60 text-white"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-1">
+                        <label className="inline-flex items-center gap-1 text-[11px] text-brand-muted hover:text-brand-primary cursor-pointer">
+                          <ImageIcon className="w-3.5 h-3.5 text-brand-secondary" />
+                          <span>Foto</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) {
+                                if (f.size > 5 * 1024 * 1024) {
+                                  alert("Ukuran foto maksimal 5MB.");
+                                  return;
+                                }
+                                setReplyPhoto(f);
+                                setReplyPhotoPreview(URL.createObjectURL(f));
+                              }
+                            }}
+                          />
+                        </label>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplyingToId(null);
+                              setReplyText("");
+                              setReplyPhoto(null);
+                              setReplyPhotoPreview(null);
+                            }}
+                            className="px-3 py-1 rounded-lg border border-brand-border text-xs font-semibold hover:bg-brand-background transition cursor-pointer"
+                          >
+                            Batal
+                          </button>
+                          <button
+                            type="button"
+                            disabled={submittingReply || (!replyText.trim() && !replyPhoto)}
+                            onClick={() => handlePostReply(c.id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-brand-secondary text-white text-xs font-bold hover:bg-brand-secondary/90 disabled:opacity-50 transition cursor-pointer"
+                          >
+                            {submittingReply ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Send className="w-3 h-3" />
+                            )}
+                            <span>Kirim</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Threaded Nested Replies */}
+                  {c.replies && c.replies.length > 0 && (
+                    <div className="ml-3 sm:ml-6 pl-3 sm:pl-4 border-l-2 border-brand-secondary/25 space-y-2.5 pt-2">
+                      {c.replies.map((r) => {
+                        const isReplyAuthor = currentUser && currentUser.id === r.user_id;
+                        return (
+                          <div
+                            key={r.id}
+                            className="p-3 rounded-xl bg-brand-surface border border-brand-border/70 space-y-1.5"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-brand-primary/10 flex items-center justify-center font-bold text-brand-primary text-[10px] shrink-0 overflow-hidden">
+                                  {r.user_avatar ? (
+                                    <img src={resolveMediaUrl(r.user_avatar)} alt={r.user_name || "User"} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span>{(r.user_name || "A").charAt(0).toUpperCase()}</span>
+                                  )}
+                                </div>
+                                <span className="font-bold text-xs text-brand-primary">
+                                  {r.user_name || "Angler"}
+                                </span>
+                                <span className="text-[10px] text-brand-muted">
+                                  {new Date(r.created_at).toLocaleDateString("id-ID", {
+                                    day: "numeric",
+                                    month: "short",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                              </div>
+
+                              {isReplyAuthor && (
+                                <button
+                                  onClick={() => handleDeleteComment(r.id, c.id)}
+                                  className="p-1 text-brand-muted hover:text-red-500 rounded transition cursor-pointer"
+                                  title="Hapus Balasan"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+
+                            {r.photo_url && (
+                              <div className="rounded-lg overflow-hidden max-w-xs border border-brand-border bg-brand-background">
+                                <img
+                                  src={resolveMediaUrl(r.photo_url)}
+                                  alt="Foto balasan"
+                                  className="w-full max-h-48 object-cover"
+                                />
+                              </div>
+                            )}
+
+                            {r.comment && (
+                              <p className="text-xs text-brand-text leading-relaxed whitespace-pre-line">
+                                {r.comment}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               );

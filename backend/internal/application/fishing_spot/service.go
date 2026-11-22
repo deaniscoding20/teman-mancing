@@ -208,10 +208,10 @@ func (s *Service) ListComments(ctx context.Context, spotID uuid.UUID, page, limi
 	return s.repo.ListComments(ctx, spotID, page, limit)
 }
 
-func (s *Service) AddComment(ctx context.Context, spotID, userID uuid.UUID, userName string, userAvatar *string, commentText string) (*domainspot.Comment, error) {
+func (s *Service) AddComment(ctx context.Context, spotID, userID uuid.UUID, userName string, userAvatar *string, parentID *uuid.UUID, photoURL *string, commentText string) (*domainspot.Comment, error) {
 	cleanText := strings.TrimSpace(commentText)
-	if cleanText == "" {
-		return nil, errors.New("comment content cannot be empty")
+	if cleanText == "" && (photoURL == nil || *photoURL == "") {
+		return nil, errors.New("comment content or photo must be provided")
 	}
 
 	// Verify spot exists
@@ -223,6 +223,20 @@ func (s *Service) AddComment(ctx context.Context, spotID, userID uuid.UUID, user
 		return nil, ErrSpotNotFound
 	}
 
+	// If replying to another comment, verify parent comment belongs to this spot
+	if parentID != nil {
+		parentComment, err := s.repo.GetCommentByID(ctx, *parentID)
+		if err != nil {
+			return nil, err
+		}
+		if parentComment == nil {
+			return nil, errors.New("parent comment not found")
+		}
+		if parentComment.SpotID != spotID {
+			return nil, errors.New("parent comment belongs to a different spot")
+		}
+	}
+
 	now := time.Now().UTC()
 	c := &domainspot.Comment{
 		ID:         uuid.New(),
@@ -230,6 +244,9 @@ func (s *Service) AddComment(ctx context.Context, spotID, userID uuid.UUID, user
 		UserID:     userID,
 		UserName:   userName,
 		UserAvatar: userAvatar,
+		ParentID:   parentID,
+		PhotoURL:   photoURL,
+		Replies:    make([]*domainspot.Comment, 0),
 		Comment:    cleanText,
 		CreatedAt:  now,
 		UpdatedAt:  now,
@@ -240,6 +257,14 @@ func (s *Service) AddComment(ctx context.Context, spotID, userID uuid.UUID, user
 	}
 
 	return c, nil
+}
+
+func (s *Service) GetCommentByID(ctx context.Context, commentID uuid.UUID) (*domainspot.Comment, error) {
+	return s.repo.GetCommentByID(ctx, commentID)
+}
+
+func (s *Service) GetCommenterIDs(ctx context.Context, spotID uuid.UUID) ([]uuid.UUID, error) {
+	return s.repo.GetSpotCommenterIDs(ctx, spotID)
 }
 
 func (s *Service) DeleteComment(ctx context.Context, commentID, actorID uuid.UUID) error {

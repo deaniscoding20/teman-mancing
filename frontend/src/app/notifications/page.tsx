@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Bell, CheckCheck, CheckCircle2, MessageSquare, Users, AlertCircle } from "lucide-react";
 import { fetchApi } from "@/lib/api-client";
 import { getStoredUser, getToken } from "@/lib/auth";
@@ -157,17 +158,43 @@ export default function NotificationsPage() {
                   )}
                 </div>
 
-                <div>
+                <div className="flex-1 min-w-0">
                   <h4 className="text-xs font-bold text-brand-primary mb-0.5">{n.title}</h4>
                   <p className="text-xs text-brand-text leading-relaxed">{n.message}</p>
-                  <span className="text-[10px] text-brand-muted mt-1 inline-block">
-                    {new Date(n.created_at).toLocaleDateString("id-ID", {
-                      day: "numeric",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
+                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                    <span className="text-[10px] text-brand-muted">
+                      {new Date(n.created_at).toLocaleDateString("id-ID", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    {n.reference_id && (
+                      <Link
+                        href={
+                          n.type.includes("comment")
+                            ? `/spots/${n.reference_id}`
+                            : n.type.includes("join") || n.type.includes("event")
+                            ? `/events/${n.reference_id}`
+                            : `/chat`
+                        }
+                        onClick={() => {
+                          if (!n.is_read) handleMarkAsRead(n.id);
+                        }}
+                        className="text-[11px] font-bold text-brand-secondary hover:underline inline-flex items-center gap-1"
+                      >
+                        <span>
+                          {n.type.includes("comment")
+                            ? "Buka Spot & Ulasan"
+                            : n.type.includes("join") || n.type.includes("event")
+                            ? "Lihat Event"
+                            : "Buka Obrolan"}{" "}
+                          &rarr;
+                        </span>
+                      </Link>
+                    )}
+                  </div>
                 </div>
               </div>
 
